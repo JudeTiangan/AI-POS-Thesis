@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "568498740495",
+    "project_id": "thesis-ai-pos",
+    "storage_bucket": "thesis-ai-pos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568498740495:android:14a68f6da4547b8c33f27a",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbJPMz-y75VaKbmOrx8j0vzIQKl1mG48g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
