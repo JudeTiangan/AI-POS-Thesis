@@ -3,10 +3,9 @@ const crypto = require('crypto');
 
 // PayMongo Configuration
 const PAYMONGO_CONFIG = {
-    // Get these from https://dashboard.paymongo.com/developers
-    // Temporarily hardcoded for testing - will fix .env issue later
-    PUBLIC_KEY: process.env.PAYMONGO_PUBLIC_KEY || 'pk_test_2XjgGBjxhpDQKduhzzeyZhSA',
-    SECRET_KEY: process.env.PAYMONGO_SECRET_KEY || 'sk_test_Za1udgYBvfjXnPz9KWkL3tjx',
+    // Replace these with your actual PayMongo keys from https://dashboard.paymongo.com/developers
+    PUBLIC_KEY: process.env.PAYMONGO_PUBLIC_KEY || 'pk_test_your_public_key_here',
+    SECRET_KEY: process.env.PAYMONGO_SECRET_KEY || 'sk_test_your_secret_key_here',
     BASE_URL: 'https://api.paymongo.com/v1',
     WEBHOOK_SECRET: process.env.PAYMONGO_WEBHOOK_SECRET || 'your_webhook_secret_here'
 };

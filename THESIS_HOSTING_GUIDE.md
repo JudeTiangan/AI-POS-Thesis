@@ -95,8 +95,8 @@ Update your `backend/package.json`:
 Create these environment variables on your hosting platform:
 ```env
 NODE_ENV=production
-PAYMONGO_PUBLIC_KEY=pk_test_2XjgGBjxhpDQKduhzzeyZhSA
-PAYMONGO_SECRET_KEY=sk_test_Za1udgYBvfjXnPz9KWkL3tjx
+PAYMONGO_PUBLIC_KEY=pk_test_your_public_key_here
+PAYMONGO_SECRET_KEY=sk_test_your_secret_key_here
 FRONTEND_URL=https://your-deployed-backend.com
 ```
 
