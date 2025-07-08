@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/category.dart';
+import 'api_config.dart';
 
 class CategoryService {
-  // TODO: Replace with your actual backend URL. For local development, this is likely your computer's IP address.
-  final String _baseUrl = 'http://localhost:3000/api/categories';
+  final String _baseUrl = ApiConfig.categoriesUrl;
 
   Future<List<Category>> getCategories() async {
     try {

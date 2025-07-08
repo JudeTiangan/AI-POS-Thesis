@@ -23,22 +23,42 @@ class CustomerAnalytics {
 
   factory CustomerAnalytics.fromJson(Map<String, dynamic> json) {
     return CustomerAnalytics(
-      customerId: json['customerId'],
+      customerId: json['customerId'] ?? '',
       itemPurchaseFrequency: Map<String, int>.from(json['itemPurchaseFrequency'] ?? {}),
       purchaseHistory: (json['purchaseHistory'] as List?)
           ?.map((p) => Purchase.fromJson(p))
           .toList() ?? [],
       categoryPreferences: Map<String, double>.from(json['categoryPreferences'] ?? {}),
-      lastPurchase: DateTime.parse(json['lastPurchase']),
-      averageOrderValue: (json['averageOrderValue'] as num).toDouble(),
-      totalOrders: json['totalOrders'],
+      lastPurchase: _parseDateTime(json['lastPurchase']),
+      averageOrderValue: json['averageOrderValue'] != null 
+          ? (json['averageOrderValue'] as num).toDouble()
+          : 0.0,
+      totalOrders: json['totalOrders'] ?? 0,
       frequentItems: List<String>.from(json['frequentItems'] ?? []),
       associationRules: Map<String, List<String>>.from(
         (json['associationRules'] as Map?)?.map(
-          (key, value) => MapEntry(key, List<String>.from(value))
+          (key, value) => MapEntry(key, List<String>.from(value ?? []))
         ) ?? {}
       ),
     );
+  }
+
+  // Helper method to parse different date formats
+  static DateTime _parseDateTime(dynamic dateValue) {
+    if (dateValue == null) return DateTime.now();
+    
+    // Handle Firebase Timestamp
+    if (dateValue.runtimeType.toString().contains('Timestamp')) {
+      return (dateValue as dynamic).toDate();
+    }
+    
+    // Handle ISO string
+    if (dateValue is String) {
+      return DateTime.parse(dateValue);
+    }
+    
+    // Fallback
+    return DateTime.now();
   }
 
   Map<String, dynamic> toJson() {
@@ -73,11 +93,13 @@ class Purchase {
 
   factory Purchase.fromJson(Map<String, dynamic> json) {
     return Purchase(
-      orderId: json['orderId'],
-      itemIds: List<String>.from(json['itemIds']),
-      timestamp: DateTime.parse(json['timestamp']),
-      totalAmount: (json['totalAmount'] as num).toDouble(),
-      categories: List<String>.from(json['categories']),
+      orderId: json['orderId'] ?? '',
+      itemIds: List<String>.from(json['itemIds'] ?? []),
+      timestamp: CustomerAnalytics._parseDateTime(json['timestamp']),
+      totalAmount: json['totalAmount'] != null 
+          ? (json['totalAmount'] as num).toDouble()
+          : 0.0,
+      categories: List<String>.from(json['categories'] ?? []),
     );
   }
 

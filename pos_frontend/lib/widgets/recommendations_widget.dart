@@ -76,7 +76,15 @@ class _RecommendationsWidgetState extends State<RecommendationsWidget> {
 
   Widget _buildRecommendationImage(Item item) {
     if (item.imageUrl == null || item.imageUrl!.isEmpty) {
-      return const Icon(Icons.fastfood, size: 40, color: Colors.grey);
+      return Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey[200],
+        ),
+        child: const Icon(Icons.fastfood, size: 32, color: Colors.grey),
+      );
     }
 
     try {
@@ -84,35 +92,59 @@ class _RecommendationsWidgetState extends State<RecommendationsWidget> {
       if (item.imageUrl!.startsWith('data:image') || item.imageUrl!.startsWith('data:application/octet-stream')) {
         final base64String = item.imageUrl!.split(',')[1];
         final Uint8List bytes = base64Decode(base64String);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            bytes,
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.broken_image, size: 40);
-            },
+        return Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey[200],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.broken_image, size: 32, color: Colors.grey);
+              },
+            ),
           ),
         );
       } else {
         // Fallback to network image
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            item.imageUrl!,
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.broken_image, size: 40);
-            },
+        return Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey[200],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              item.imageUrl!,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.broken_image, size: 32, color: Colors.grey);
+              },
+            ),
           ),
         );
       }
     } catch (e) {
-      return const Icon(Icons.broken_image, size: 40);
+      return Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey[200],
+        ),
+        child: const Icon(Icons.broken_image, size: 32, color: Colors.grey),
+      );
     }
   }
 

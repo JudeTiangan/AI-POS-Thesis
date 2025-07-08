@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Allow HTTP for localhost development -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Add your production server domain here when ready -->
+        <!-- <domain includeSubdomains="true">your-production-domain.com</domain> -->
+    </domain-config>
+    
+    <!-- For PayMongo API (HTTPS only) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.paymongo.com</domain>
+        <domain includeSubdomains="true">secure-authentication.paymongo.com</domain>
+    </domain-config>
+</network-security-config> 

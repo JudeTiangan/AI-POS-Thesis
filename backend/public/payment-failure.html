@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Failed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 50px; 
+            background: #ffeaa7; 
+            margin: 0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .failure { 
+            color: #e74c3c; 
+            font-size: 24px; 
+            margin-bottom: 20px; 
+            font-weight: bold;
+        }
+        .message { 
+            font-size: 18px; 
+            margin-bottom: 30px; 
+            color: #333;
+            line-height: 1.5;
+        }
+        .close-btn { 
+            background: #e74c3c; 
+            color: white; 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        .retry-btn {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">❌</div>
+        <div class="failure">Payment Failed</div>
+        <div class="message">
+            Your GCash payment could not be processed.<br>
+            Please try again or use a different payment method.
+        </div>
+        <div class="message" style="font-size: 14px; color: #666;">
+            You can now close this window and return to the app to retry your order.
+        </div>
+        <button class="retry-btn" onclick="window.close()">Return to App</button>
+        <button class="close-btn" onclick="window.close()">Close Window</button>
+        
+        <script>
+            // Auto-close after 10 seconds
+            setTimeout(() => {
+                window.close();
+            }, 10000);
+            
+            // Try to send message to parent window if in iframe
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'payment_failed',
+                        status: 'failed'
+                    }, '*');
+                }
+            } catch (e) {
+                console.log('Could not communicate with parent window');
+            }
+        </script>
+    </div>
+</body>
+</html> 

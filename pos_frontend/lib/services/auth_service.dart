@@ -1,10 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:frontend/services/api_config.dart';
 import 'dart:convert';
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  final String _baseUrl = 'http://localhost:3000/api/auth'; // Use 10.0.2.2 for Android emulator
+  final String _baseUrl = ApiConfig.authUrl;
 
   // Stream for auth state changes
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();

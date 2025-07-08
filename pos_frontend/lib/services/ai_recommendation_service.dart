@@ -1,13 +1,12 @@
-import 'dart:convert';
 import 'dart:math';
-import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:frontend/models/item.dart';
 import 'package:frontend/models/customer_analytics.dart';
 import 'package:frontend/services/auth_service.dart';
+import 'package:frontend/services/api_config.dart';
 
 class AIRecommendationService {
-  final String _baseUrl = 'http://localhost:3000/api';
+  final String _baseUrl = ApiConfig.baseUrl;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AuthService _authService = AuthService();
 

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 50px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+        .success-icon {
+            font-size: 80px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        .message {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .sub-message {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .close-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .close-btn:hover {
+            background: #0056b3;
+        }
+        .test-note {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #004085;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>Payment Successful!</h1>
+        <div class="message">Your test payment has been completed successfully.</div>
+        <div class="sub-message">You can now close this window and return to the app.</div>
+        
+        <button class="close-btn" onclick="window.close()">Close Window</button>
+        <button class="close-btn" onclick="goToApp()">Return to App</button>
+        
+        <div class="test-note">
+            <strong>Test Mode:</strong> This is a test payment. No real money has been charged.
+            Please return to your Flutter app and click "Mark as Paid (Test)" to complete the order.
+        </div>
+    </div>
+
+    <script>
+        function goToApp() {
+            // Try to go back to the app
+            window.history.back();
+            // Also try to close if possible
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        }
+
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            window.close();
+        }, 10000);
+    </script>
+</body>
+</html> 

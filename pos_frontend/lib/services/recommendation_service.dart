@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/item.dart';
+import 'api_config.dart';
 
 class RecommendationService {
-  final String _baseUrl = 'http://localhost:3000/api/recommendations';
+  final String _baseUrl = ApiConfig.recommendationsUrl;
 
   Future<List<Item>> getRecommendations({
     required List<Item> currentCart,

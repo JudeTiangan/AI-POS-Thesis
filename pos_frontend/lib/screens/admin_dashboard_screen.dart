@@ -3,6 +3,7 @@ import 'package:frontend/screens/manage_categories_screen.dart';
 import 'package:frontend/screens/manage_items_screen.dart';
 import 'package:frontend/screens/reports_screen.dart';
 import 'package:frontend/screens/ai_analytics_screen.dart';
+import 'package:frontend/screens/admin_order_management_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -24,11 +25,12 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             const Text(
               'Welcome to the Admin Panel',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -52,6 +54,19 @@ class AdminDashboardScreen extends StatelessWidget {
                 Expanded(
                   child: _buildDashboardCard(
                     context,
+                    'Order Management',
+                    'View and manage customer orders, track status',
+                    Icons.receipt_long,
+                    Colors.blue,
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const AdminOrderManagementScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildDashboardCard(
+                    context,
                     'Manage Categories',
                     'Add, edit, and organize product categories',
                     Icons.category,
@@ -61,7 +76,13 @@ class AdminDashboardScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
                 Expanded(
                   child: _buildDashboardCard(
                     context,
@@ -73,6 +94,10 @@ class AdminDashboardScreen extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => const ManageItemsScreen()),
                     ),
                   ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Container(), // Empty container for spacing
                 ),
               ],
             ),
@@ -123,6 +148,7 @@ class AdminDashboardScreen extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -169,12 +195,7 @@ class AdminDashboardScreen extends StatelessWidget {
     return Card(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const AIAnalyticsScreen()),
-        ),
-        child: Container(
+      child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -221,7 +242,7 @@ class AdminDashboardScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Tap to explore advanced AI analytics',
+                          'Advanced AI analytics and insights',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
@@ -230,11 +251,6 @@ class AdminDashboardScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.blue,
-                    size: 20,
                   ),
                 ],
               ),
@@ -306,8 +322,7 @@ class AdminDashboardScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildFeatureItem(String title, String description, Color color) {

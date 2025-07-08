@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:frontend/models/item.dart';
+import 'package:frontend/services/api_config.dart';
 
 class ItemService {
-  // TODO: Replace with your actual backend URL.
-  final String _baseUrl = 'http://localhost:3000/api/items';
+  final String _baseUrl = ApiConfig.itemsUrl;
 
   Future<List<Item>> getItems() async {
     try {

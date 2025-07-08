@@ -1,18 +1,24 @@
 {
-  "name": "backend",
+  "name": "ai-pos-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI-Powered POS System Backend with PayMongo GCash Integration",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "engines": {
+    "node": "18.x",
+    "npm": "8.x"
+  },
+  "keywords": ["pos", "ai", "paymongo", "gcash", "thesis"],
+  "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "@google-cloud/firestore": "^7.8.0",
     "@google/generative-ai": "^0.12.0",
+    "axios": "^1.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
     "express": "^4.19.2",

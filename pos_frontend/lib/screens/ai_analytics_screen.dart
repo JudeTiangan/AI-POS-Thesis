@@ -30,21 +30,16 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final user = _authService.currentUser;
+      print('🔄 Loading AI Analytics...');
       
-      // Load customer-specific analytics
-      if (user != null) {
-        final doc = await _firestore.collection('customerAnalytics').doc(user.uid).get();
-        if (doc.exists) {
-          _customerAnalytics = CustomerAnalytics.fromJson(doc.data()!);
-        }
-      }
-      
-      // Load global analytics
+      // Load global analytics (includes customer insights)
       await _loadGlobalAnalytics();
       
+      // Load customer behavior patterns
+      await _loadCustomerInsights();
+      
     } catch (e) {
-      print('Error loading analytics: $e');
+      print('❌ Error loading analytics: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -52,33 +47,60 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
 
   Future<void> _loadGlobalAnalytics() async {
     try {
-      // Get all customer analytics
-      final analyticsSnapshot = await _firestore.collection('customerAnalytics').get();
+      print('🔄 Loading global analytics...');
+      
+      // Get all orders directly from orders collection
+      final ordersSnapshot = await _firestore.collection('orders').get();
       
       Map<String, int> globalItemFrequency = {};
       Map<String, double> globalCategoryPreferences = {};
-      List<String> allCustomers = [];
+      Set<String> allCustomers = {};
       int totalOrders = 0;
       double totalRevenue = 0.0;
       
-      for (final doc in analyticsSnapshot.docs) {
-        final analytics = CustomerAnalytics.fromJson(doc.data());
-        allCustomers.add(analytics.customerId);
-        totalOrders += analytics.totalOrders;
-        totalRevenue += analytics.averageOrderValue * analytics.totalOrders;
+      for (final doc in ordersSnapshot.docs) {
+        final orderData = doc.data();
+        final userId = orderData['userId'] as String?;
+        final orderTotal = (orderData['totalPrice'] as num?)?.toDouble() ?? 0.0;
+        final items = orderData['items'] as List?;
         
-        // Aggregate item frequencies
-        analytics.itemPurchaseFrequency.forEach((itemId, count) {
-          globalItemFrequency[itemId] = (globalItemFrequency[itemId] ?? 0) + count;
-        });
+        if (userId != null) {
+          allCustomers.add(userId);
+        }
         
-        // Aggregate category preferences
-        analytics.categoryPreferences.forEach((categoryId, preference) {
-          globalCategoryPreferences[categoryId] = (globalCategoryPreferences[categoryId] ?? 0.0) + preference;
-        });
+        totalOrders++;
+        totalRevenue += orderTotal;
+        
+        // Process items in the order
+        if (items != null) {
+          for (final item in items) {
+            if (item is Map<String, dynamic>) {
+              final itemId = item['itemId'] as String?;
+              final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
+              
+              if (itemId != null) {
+                globalItemFrequency[itemId] = (globalItemFrequency[itemId] ?? 0) + quantity;
+                
+                // Try to get category for this item
+                try {
+                  final itemDoc = await _firestore.collection('items').doc(itemId).get();
+                  if (itemDoc.exists) {
+                    final itemData = itemDoc.data()!;
+                    final categoryId = itemData['categoryId'] as String?;
+                    if (categoryId != null) {
+                      globalCategoryPreferences[categoryId] = (globalCategoryPreferences[categoryId] ?? 0.0) + quantity;
+                    }
+                  }
+                } catch (e) {
+                  print('Could not fetch category for item $itemId: $e');
+                }
+              }
+            }
+          }
+        }
       }
       
-      // Calculate association rules
+      // Calculate association rules from orders
       final associationRules = await _calculateGlobalAssociationRules();
       
       _globalAnalytics = {
@@ -90,33 +112,163 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
         'categoryPreferences': globalCategoryPreferences,
         'associationRules': associationRules,
       };
+      
+      print('✅ Global analytics loaded: ${_globalAnalytics['totalOrders']} orders, ${_globalAnalytics['totalCustomers']} customers');
+      
     } catch (e) {
-      print('Error loading global analytics: $e');
+      print('❌ Error loading global analytics: $e');
     }
+  }
+
+  Future<void> _loadCustomerInsights() async {
+    try {
+      print('👥 Loading customer behavior insights...');
+      
+      // First, let's check if there are any orders at all
+      final ordersSnapshot = await _firestore.collection('orders').get();
+      print('📋 Total orders in database: ${ordersSnapshot.docs.length}');
+      
+      // Get all customer analytics to understand customer behavior patterns
+      final analyticsSnapshot = await _firestore.collection('customerAnalytics').get();
+      print('📊 Customer analytics documents found: ${analyticsSnapshot.docs.length}');
+      
+      if (analyticsSnapshot.docs.isNotEmpty) {
+        List<CustomerAnalytics> allCustomerAnalytics = [];
+        
+        for (final doc in analyticsSnapshot.docs) {
+          try {
+            print('🔍 Processing analytics for customer: ${doc.id}');
+            final analytics = CustomerAnalytics.fromJson(doc.data());
+            allCustomerAnalytics.add(analytics);
+            print('✅ Analytics parsed successfully for ${doc.id}: ${analytics.totalOrders} orders');
+          } catch (e) {
+            print('❌ Error parsing customer analytics for ${doc.id}: $e');
+          }
+        }
+        
+        if (allCustomerAnalytics.isNotEmpty) {
+          // Calculate aggregate customer insights
+          _customerAnalytics = _calculateAggregateCustomerInsights(allCustomerAnalytics);
+          print('✅ Customer insights calculated for ${allCustomerAnalytics.length} customers');
+          print('📊 Aggregate stats: ${_customerAnalytics?.totalOrders} total orders, ${_customerAnalytics?.frequentItems.length} popular items');
+        } else {
+          print('⚠️ No valid customer analytics could be parsed');
+          _customerAnalytics = null;
+        }
+      } else {
+        print('📝 No customer analytics found in database');
+        if (ordersSnapshot.docs.isNotEmpty) {
+          print('⚠️ Warning: Orders exist but no analytics found - analytics may not be generating properly');
+        }
+        _customerAnalytics = null;
+      }
+      
+    } catch (e) {
+      print('❌ Error loading customer insights: $e');
+      _customerAnalytics = null;
+    }
+  }
+
+  CustomerAnalytics? _calculateAggregateCustomerInsights(List<CustomerAnalytics> allCustomers) {
+    if (allCustomers.isEmpty) return null;
+    
+    // Aggregate data across all customers
+    Map<String, int> totalItemFrequency = {};
+    Map<String, double> totalCategoryPreferences = {};
+    List<String> allFrequentItems = [];
+    double totalAverageOrderValue = 0;
+    int totalOrdersAllCustomers = 0;
+    DateTime? mostRecentPurchase;
+    
+    for (final customer in allCustomers) {
+      // Aggregate item frequencies
+      customer.itemPurchaseFrequency.forEach((itemId, count) {
+        totalItemFrequency[itemId] = (totalItemFrequency[itemId] ?? 0) + count;
+      });
+      
+      // Aggregate category preferences
+      customer.categoryPreferences.forEach((categoryId, preference) {
+        totalCategoryPreferences[categoryId] = (totalCategoryPreferences[categoryId] ?? 0) + preference;
+      });
+      
+      // Add frequent items
+      allFrequentItems.addAll(customer.frequentItems);
+      
+      // Sum up order values and counts
+      totalAverageOrderValue += customer.averageOrderValue * customer.totalOrders;
+      totalOrdersAllCustomers += customer.totalOrders;
+      
+      // Find most recent purchase
+      if (mostRecentPurchase == null || customer.lastPurchase.isAfter(mostRecentPurchase)) {
+        mostRecentPurchase = customer.lastPurchase;
+      }
+    }
+    
+    // Calculate overall average order value
+    final overallAverageOrderValue = totalOrdersAllCustomers > 0 
+        ? totalAverageOrderValue / totalOrdersAllCustomers : 0.0;
+    
+    // Find most popular items across all customers
+    final popularItems = totalItemFrequency.entries
+        .toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+    
+    final topFrequentItems = popularItems.take(5).map((e) => e.key).toList();
+    
+    // Normalize category preferences
+    final totalCategorySum = totalCategoryPreferences.values.fold(0.0, (sum, value) => sum + value);
+    if (totalCategorySum > 0) {
+      totalCategoryPreferences.forEach((key, value) {
+        totalCategoryPreferences[key] = value / totalCategorySum;
+      });
+    }
+    
+    // Create aggregate customer insights
+    return CustomerAnalytics(
+      customerId: 'ALL_CUSTOMERS',
+      itemPurchaseFrequency: totalItemFrequency,
+      purchaseHistory: [], // Not needed for aggregate view
+      categoryPreferences: totalCategoryPreferences,
+      lastPurchase: mostRecentPurchase ?? DateTime.now(),
+      averageOrderValue: overallAverageOrderValue,
+      totalOrders: totalOrdersAllCustomers,
+      frequentItems: topFrequentItems,
+      associationRules: {}, // Will be calculated separately
+    );
   }
 
   Future<List<Map<String, dynamic>>> _calculateGlobalAssociationRules() async {
     try {
       final ordersSnapshot = await _firestore.collection('orders').get();
-      final orderItemsSnapshot = await _firestore.collection('orderItems').get();
       
-      // Build transaction database
+      // Build transaction database from orders directly
       Map<String, List<String>> transactions = {};
       Map<String, String> itemNames = {}; // itemId -> itemName
       
       for (final orderDoc in ordersSnapshot.docs) {
-        transactions[orderDoc.id] = [];
-      }
-      
-      for (final orderItemDoc in orderItemsSnapshot.docs) {
-        final data = orderItemDoc.data();
-        final orderId = data['orderId'];
-        final itemId = data['itemId'];
-        final itemName = data['itemName'];
+        final orderData = orderDoc.data();
+        final items = orderData['items'] as List?;
         
-        if (transactions.containsKey(orderId)) {
-          transactions[orderId]!.add(itemId);
-          itemNames[itemId] = itemName;
+        if (items != null && items.isNotEmpty) {
+          List<String> orderItems = [];
+          
+          for (final item in items) {
+            if (item is Map<String, dynamic>) {
+              final itemId = item['itemId'] as String?;
+              final itemName = item['itemName'] as String?;
+              
+              if (itemId != null) {
+                orderItems.add(itemId);
+                if (itemName != null) {
+                  itemNames[itemId] = itemName;
+                }
+              }
+            }
+          }
+          
+          if (orderItems.length > 1) { // Only include orders with multiple items
+            transactions[orderDoc.id] = orderItems;
+          }
         }
       }
       
@@ -243,16 +395,21 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Customer Behavior Analysis
-                  if (_customerAnalytics != null) ...[
-                    _buildSectionTitle('👤 Your Personal Shopping Profile'),
-                    const SizedBox(height: 16),
-                    _buildCustomerAnalytics(),
-                  ] else ...[
-                    _buildSectionTitle('👤 Customer Analytics'),
-                    const SizedBox(height: 16),
-                    _buildLoginPrompt(),
-                  ],
+                  // Customer Analytics Section
+                  const SizedBox(height: 24),
+                  const Row(
+                    children: [
+                      Icon(Icons.person, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('👤 Customer Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Show customer analytics or no data message
+                  _customerAnalytics != null 
+                    ? _buildCustomerAnalytics()
+                    : _buildNoDataMessage(),
                   
                   const SizedBox(height: 24),
                   
@@ -409,18 +566,25 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
     
     return Column(
       children: [
-        // Customer stats
+        // Customer insights stats
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Shopping Behavior', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Total Orders: ${analytics.totalOrders}'),
-                Text('Average Order Value: ₱${analytics.averageOrderValue.toStringAsFixed(2)}'),
-                Text('Last Purchase: ${analytics.lastPurchase.day}/${analytics.lastPurchase.month}/${analytics.lastPurchase.year}'),
+                const Row(
+                  children: [
+                    Icon(Icons.people, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Customer Behavior Insights', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildStatsRow('Total Customer Orders', '${analytics.totalOrders}'),
+                _buildStatsRow('Average Order Value (All)', '₱${analytics.averageOrderValue.toStringAsFixed(2)}'),
+                _buildStatsRow('Most Recent Activity', _formatDate(analytics.lastPurchase)),
+                _buildStatsRow('Total Items Sold', '${analytics.itemPurchaseFrequency.values.fold(0, (sum, count) => sum + count)}'),
               ],
             ),
           ),
@@ -428,23 +592,90 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
         
         const SizedBox(height: 16),
         
-        // Frequent items
+        // Most popular items across all customers
         if (analytics.frequentItems.isNotEmpty) ...[
-          const Text('Your Favorite Items', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
           Card(
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: analytics.frequentItems.length,
-              itemBuilder: (context, index) {
-                final itemId = analytics.frequentItems[index];
-                final frequency = analytics.itemPurchaseFrequency[itemId] ?? 0;
-                return ListTile(
-                  title: Text('Item ID: $itemId'),
-                  trailing: Text('$frequency times'),
-                );
-              },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.trending_up, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text('Most Popular Items (All Customers)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...analytics.frequentItems.take(5).map((itemId) {
+                    final frequency = analytics.itemPurchaseFrequency[itemId] ?? 0;
+                    return FutureBuilder<String>(
+                      future: _getItemName(itemId),
+                      builder: (context, snapshot) {
+                        final itemName = snapshot.data ?? 'Loading...';
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.orange[100],
+                            child: Text('$frequency'),
+                          ),
+                          title: Text(itemName),
+                          subtitle: Text('Sold $frequency time${frequency > 1 ? 's' : ''} across all customers'),
+                          trailing: const Icon(Icons.local_fire_department, color: Colors.orange),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        
+        // Customer category preferences
+        if (analytics.categoryPreferences.isNotEmpty) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.pie_chart, color: Colors.purple),
+                      SizedBox(width: 8),
+                      Text('Customer Category Preferences', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...analytics.categoryPreferences.entries.map((entry) {
+                    final percentage = (entry.value * 100).toStringAsFixed(1);
+                    return FutureBuilder<String>(
+                      future: _getCategoryName(entry.key),
+                      builder: (context, snapshot) {
+                        final categoryName = snapshot.data ?? 'Loading...';
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.purple[100],
+                            child: Text('${percentage}%', style: const TextStyle(fontSize: 10)),
+                          ),
+                          title: Text(categoryName),
+                          subtitle: Text('$percentage% of all customer purchases'),
+                          trailing: SizedBox(
+                            width: 100,
+                            child: LinearProgressIndicator(
+                              value: entry.value,
+                              backgroundColor: Colors.grey[300],
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.purple[400]!),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ],
+              ),
             ),
           ),
         ],
@@ -452,28 +683,90 @@ class _AIAnalyticsScreenState extends State<AIAnalyticsScreen> {
     );
   }
 
-  Widget _buildLoginPrompt() {
+  Widget _buildNoDataMessage() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Icon(Icons.person_outline, size: 48, color: Colors.grey),
+            const Icon(Icons.people_outline, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
             const Text(
-              'Login to see your personal shopping analytics',
+              'No customer analytics available',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Track your purchase patterns, favorite items, and personalized recommendations',
+            Text(
+              'Customer behavior insights will appear here once customers make purchases.\n\nCheck the console (F12) for detailed debugging information.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadAnalytics,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh Analytics'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildStatsRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date).inDays;
+    
+    if (difference == 0) {
+      return 'Today';
+    } else if (difference == 1) {
+      return 'Yesterday';
+    } else if (difference < 7) {
+      return '$difference days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  Future<String> _getItemName(String itemId) async {
+    try {
+      final doc = await _firestore.collection('items').doc(itemId).get();
+      if (doc.exists) {
+        return doc.data()!['name'] ?? 'Unknown Item';
+      }
+    } catch (e) {
+      print('Error fetching item name: $e');
+    }
+    return 'Item #${itemId.substring(0, 8)}';
+  }
+
+  Future<String> _getCategoryName(String categoryId) async {
+    try {
+      final doc = await _firestore.collection('categories').doc(categoryId).get();
+      if (doc.exists) {
+        return doc.data()!['name'] ?? 'Unknown Category';
+      }
+    } catch (e) {
+      print('Error fetching category name: $e');
+    }
+    return 'Category #${categoryId.substring(0, 8)}';
   }
 
   Widget _buildAlgorithmExplanation() {

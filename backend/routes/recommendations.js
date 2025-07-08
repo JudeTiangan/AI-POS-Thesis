@@ -5,7 +5,8 @@ const { db } = require('../config/firebase');
 
 // IMPORTANT: Go to https://aistudio.google.com/app/apikey to get your API key
 // Add it as an environment variable named GEMINI_API_KEY
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Temporarily hardcoded for testing - will fix .env issue later
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'AIzaSyCcAFUwBcrSyiN2A3EyABa5rkOtscnDyUs');
 
 // POST for getting recommendations
 router.post('/', async (req, res) => {
@@ -53,7 +54,7 @@ router.post('/', async (req, res) => {
 });
 
 async function getGeminiRecommendations(currentCart, userHistory) {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // TODO: Fetch full item details for the prompt
     const allItemsSnapshot = await db.collection('items').get();

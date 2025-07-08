@@ -38,25 +38,19 @@ class AuthWrapper extends StatelessWidget {
 
   Future<String> _getUserRole(String uid) async {
     try {
-      print('Checking role for UID: $uid');
       final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      print('Document exists: ${doc.exists}');
       if (doc.exists) {
-        print('Document data: ${doc.data()}');
-        if (doc.data()!.containsKey('role')) {
-          final role = doc.data()!['role'];
-          print('User role found: $role');
-          return role;
-        } else {
-          print('No role field found in document');
+        final data = doc.data();
+        if (data != null && data.containsKey('role')) {
+          return data['role'] as String;
         }
-      } else {
-        print('Document does not exist for UID: $uid');
       }
-      return 'customer'; // Default role
+      // User document doesn't exist - this is normal for users who signed in 
+      // but weren't registered through the app. Default to customer role.
+      return 'customer';
     } catch (e) {
-      print('Error getting user role: $e');
-      return 'customer'; // Default on error
+      // Silently handle errors and default to customer role
+      return 'customer';
     }
   }
 

@@ -1,75 +1,268 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:frontend/models/item.dart';
-import 'package:frontend/models/order.dart'; // We will create this model next
-import 'package:frontend/services/ai_recommendation_service.dart';
+import 'package:frontend/models/order.dart';
+import 'package:frontend/services/api_config.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OrderService {
-  final String _baseUrl = 'http://localhost:3000/api/orders';
-  final AIRecommendationService _aiService = AIRecommendationService();
+  static String get baseUrl => ApiConfig.ordersUrl;
 
-  Future<String> createOrder({
+  // Create a new order
+  static Future<Map<String, dynamic>> createOrder({
     required String userId,
-    required List<Item> items,
+    required List<OrderItem> items,
     required double totalPrice,
+    required OrderType orderType,
+    required PaymentMethod paymentMethod,
+    required String customerName,
+    required String customerEmail,
+    String? customerPhone,
+    DeliveryAddress? deliveryAddress,
   }) async {
     try {
-      // Create lightweight item data without base64 images
-      final lightweightItems = items.map((item) => {
-        'id': item.id,
-        'name': item.name,
-        'price': item.price,
-        'categoryId': item.categoryId,
-        'barcode': item.barcode,
-        // Exclude imageUrl to avoid sending massive base64 data
-      }).toList();
-
+      print('🔄 Creating order with API: ${ApiConfig.baseUrl}');
+      
       final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${ApiConfig.baseUrl}/orders'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
           'userId': userId,
-          'items': lightweightItems,
+          'items': items.map((item) => item.toJson()).toList(),
           'totalPrice': totalPrice,
+          'orderType': orderType.name,
+          'paymentMethod': paymentMethod.name,
+          'customerName': customerName,
+          'customerEmail': customerEmail,
+          'customerPhone': customerPhone,
+          'deliveryAddress': deliveryAddress?.toJson(),
         }),
       );
 
+      print('📋 Order creation response: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
+
       if (response.statusCode == 201) {
-        final body = jsonDecode(response.body);
-        final orderId = body['orderId'];
-        
-        // 🧠 Update customer analytics for AI recommendations
-        try {
-          await _aiService.updateCustomerAnalytics(userId, items, totalPrice);
-          print('✅ Customer analytics updated for AI recommendations');
-        } catch (e) {
-          print('⚠️ Failed to update customer analytics: $e');
-          // Don't fail the order if analytics update fails
-        }
-        
-        return orderId; // Return the new order's ID
+        final responseData = jsonDecode(response.body);
+        return {
+          'success': true,
+          'order': Order.fromJson(responseData['order']),
+          'paymentUrl': responseData['paymentUrl'], // For GCash payments
+        };
       } else {
-        throw 'Failed to create order. Status: ${response.statusCode}, Body: ${response.body}';
+        return {
+          'success': false,
+          'message': 'Failed to create order: ${response.body}',
+        };
       }
     } catch (e) {
-      print('Error in createOrder: $e');
-      throw e.toString();
+      print('❌ Error creating order: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+      };
     }
   }
 
-  Future<List<Order>> getUserOrders(String userId) async {
+  // Get user orders
+  static Future<List<Order>> getUserOrders() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/user/$userId'));
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/user/${user.uid}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
       if (response.statusCode == 200) {
-        List<dynamic> body = jsonDecode(response.body);
-        List<Order> orders = body.map((dynamic item) => Order.fromJson(item)).toList();
-        return orders;
+        final List<dynamic> ordersData = jsonDecode(response.body);
+        return ordersData.map((orderJson) => Order.fromJson(orderJson)).toList();
       } else {
-        throw "Failed to load user's orders";
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to fetch orders');
       }
     } catch (e) {
-      print('Error in getUserOrders: $e');
-      throw e.toString();
+      print('Error fetching user orders: $e');
+      rethrow;
+    }
+  }
+
+  // Get all orders for admin
+  static Future<List<Order>> getAdminOrders({
+    String? status,
+    String? orderType,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+      };
+      
+      if (status != null) queryParams['status'] = status;
+      if (orderType != null) queryParams['orderType'] = orderType;
+
+      final uri = Uri.parse('$baseUrl/admin').replace(queryParameters: queryParams);
+      
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> ordersData = jsonDecode(response.body);
+        return ordersData.map((orderJson) => Order.fromJson(orderJson)).toList();
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to fetch admin orders');
+      }
+    } catch (e) {
+      print('Error fetching admin orders: $e');
+      rethrow;
+    }
+  }
+
+  // Update order status (admin only)
+  static Future<bool> updateOrderStatus({
+    required String orderId,
+    required OrderStatus orderStatus,
+    String? adminNotes,
+    DateTime? estimatedReadyTime,
+  }) async {
+    try {
+      final requestBody = {
+        'orderStatus': orderStatus.name,
+        if (adminNotes != null) 'adminNotes': adminNotes,
+        if (estimatedReadyTime != null) 'estimatedReadyTime': estimatedReadyTime.toIso8601String(),
+      };
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/$orderId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating order status: $e');
+      return false;
+    }
+  }
+
+  // Update payment status
+  static Future<bool> updatePaymentStatus({
+    required String orderId,
+    required PaymentStatus paymentStatus,
+    String? paymentTransactionId,
+  }) async {
+    try {
+      final requestBody = {
+        'paymentStatus': paymentStatus.name,
+        if (paymentTransactionId != null) 'paymentTransactionId': paymentTransactionId,
+      };
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/$orderId/payment'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating payment status: $e');
+      return false;
+    }
+  }
+
+  // Get specific order by ID
+  static Future<Order?> getOrderById(String orderId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/$orderId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final orderData = jsonDecode(response.body);
+        return Order.fromJson(orderData);
+      } else {
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching order: $e');
+      return null;
+    }
+  }
+
+  // Delete order (admin only, for completed orders)
+  static Future<bool> deleteOrder(String orderId) async {
+    try {
+      print('🗑️ Attempting to delete order: $orderId');
+      print('🔗 DELETE URL: $baseUrl/$orderId');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/$orderId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('📋 Delete response status: ${response.statusCode}');
+      print('📋 Delete response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ Order $orderId deleted successfully');
+        return true;
+      } else {
+        // Parse error message from response
+        String errorMessage = 'Unknown error';
+        try {
+          final error = jsonDecode(response.body);
+          errorMessage = error['message'] ?? 'Delete request failed';
+        } catch (e) {
+          errorMessage = 'HTTP ${response.statusCode}: ${response.body}';
+        }
+        
+        print('❌ Failed to delete order: $errorMessage');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error deleting order: $e');
+      return false;
+    }
+  }
+
+  // Helper method to calculate estimated delivery time
+  static DateTime calculateEstimatedDeliveryTime({
+    required OrderType orderType,
+    int preparationMinutes = 15,
+    int deliveryMinutes = 30,
+  }) {
+    final now = DateTime.now();
+    if (orderType == OrderType.pickup) {
+      return now.add(Duration(minutes: preparationMinutes));
+    } else {
+      return now.add(Duration(minutes: preparationMinutes + deliveryMinutes));
+    }
+  }
+
+  // Helper method to get orders by status
+  static Future<List<Order>> getOrdersByStatus(OrderStatus status) async {
+    return await getAdminOrders(status: status.name);
+  }
+
+  // Helper method to get pending payments
+  static Future<List<Order>> getPendingPayments() async {
+    try {
+      final orders = await getAdminOrders();
+      return orders.where((order) => 
+        order.paymentStatus == PaymentStatus.pending && 
+        order.paymentMethod == PaymentMethod.gcash
+      ).toList();
+    } catch (e) {
+      print('Error fetching pending payments: $e');
+      return [];
     }
   }
 } 
