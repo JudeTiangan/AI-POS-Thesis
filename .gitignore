@@ -18,10 +18,14 @@ pos_frontend/.flutter-plugins
 pos_frontend/.flutter-plugins-dependencies
 pos_frontend/.metadata
 
-# Firebase
+# Firebase & Sensitive Files
 pos_frontend/ios/firebase_app_id_file.json
 pos_frontend/android/app/google-services.json
 pos_frontend/ios/Runner/GoogleService-Info.plist
+backend/config/serviceAccountKey.json
+**/serviceAccountKey.json
+**/*.pem
+**/*.key
 
 # IDE
 .vscode/
