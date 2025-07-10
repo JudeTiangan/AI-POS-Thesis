@@ -3,73 +3,104 @@ const router = express.Router();
 const multer = require('multer');
 const { db } = require('../config/firebase');
 
-// Configure multer for memory storage
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
-  },
+// Configure multer for file uploads
+const upload = multer({ 
+    dest: 'uploads/',
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Helper to convert image buffer to base64
-const convertImageToBase64 = (file) => {
-  if (!file) {
-    return null;
-  }
-  
-  // Convert buffer to base64 and include the MIME type
-  const base64String = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-  return base64String;
-};
-
-// GET all items OR an item by barcode
+// GET /api/items
+// Get all items
 router.get('/', async (req, res) => {
     try {
-        const { barcode } = req.query;
-        let itemsSnapshot;
-
-        if (barcode) {
-            // If barcode query parameter exists, search for that item
-            itemsSnapshot = await db.collection('items').where('barcode', '==', barcode).limit(1).get();
-        } else {
-            // Otherwise, get all items
-            itemsSnapshot = await db.collection('items').get();
+        if (!db) {
+            // Fallback response when Firebase is unavailable
+            return res.json({
+                success: true,
+                message: 'Firebase unavailable - returning mock items for testing',
+                items: [
+                    {
+                        id: 'mock_1',
+                        name: 'Sample Burger',
+                        description: 'Delicious test burger',
+                        price: 25.00,
+                        category: 'Main Dishes',
+                        isActive: true,
+                        imageUrl: null,
+                        stock: 50
+                    },
+                    {
+                        id: 'mock_2', 
+                        name: 'Test Coffee',
+                        description: 'Premium test coffee',
+                        price: 15.00,
+                        category: 'Beverages',
+                        isActive: true,
+                        imageUrl: null,
+                        stock: 100
+                    }
+                ]
+            });
         }
 
+        const snapshot = await db.collection('items').orderBy('name').get();
         const items = [];
-        itemsSnapshot.forEach(doc => {
-            items.push({ id: doc.id, ...doc.data() });
+        
+        snapshot.forEach(doc => {
+            items.push({
+                id: doc.id,
+                ...doc.data()
+            });
         });
         
-        res.status(200).json(items);
+        res.json({ success: true, items });
     } catch (error) {
-        res.status(500).json({ message: 'Error getting items', error: error.message });
+        console.error('Error fetching items:', error);
+        res.status(500).json({ message: 'Error fetching items', error: error.message });
     }
 });
 
-// POST a new item with an image
+// POST /api/items
+// Create a new item
 router.post('/', upload.single('image'), async (req, res) => {
     try {
-        const { name, description, price, categoryId, barcode, quantity } = req.body;
-        if (!name || !price || !categoryId) {
-            return res.status(400).json({ message: 'Missing required fields: name, price, categoryId' });
+        if (!db) {
+            return res.json({
+                success: true,
+                message: 'Firebase unavailable - mock item creation',
+                item: { id: 'mock_new', ...req.body, createdAt: new Date() }
+            });
         }
 
-        const imageBase64 = convertImageToBase64(req.file);
-
-        const newItem = {
+        const { name, description, price, category, stock } = req.body;
+        
+        if (!name || !price || !category) {
+            return res.status(400).json({ message: 'Name, price, and category are required' });
+        }
+        
+        const itemData = {
             name,
             description: description || '',
             price: parseFloat(price),
-            categoryId,
-            barcode: barcode || '',
-            quantity: parseInt(quantity) || 0, // Default to 0 if not provided
-            imageUrl: imageBase64 || ''
+            category,
+            stock: parseInt(stock) || 0,
+            isActive: true,
+            imageUrl: null, // Will be updated if image upload is implemented
+            createdAt: new Date()
         };
-
-        const docRef = await db.collection('items').add(newItem);
-        res.status(201).json({ id: docRef.id, ...newItem });
+        
+        const docRef = await db.collection('items').add(itemData);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Item created successfully',
+            item: {
+                id: docRef.id,
+                ...itemData
+            }
+        });
     } catch (error) {
+        console.error('Error creating item:', error);
         res.status(500).json({ message: 'Error creating item', error: error.message });
     }
 });

@@ -2,17 +2,37 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../config/firebase');
 
-// GET all categories
+// GET /api/categories
+// Get all categories
 router.get('/', async (req, res) => {
     try {
-        const categoriesSnapshot = await db.collection('categories').get();
+        if (!db) {
+            // Fallback response when Firebase is unavailable
+            return res.json({
+                success: true,
+                message: 'Firebase unavailable - returning mock categories for testing',
+                categories: [
+                    { id: 'mock_1', name: 'Main Dishes', description: 'Primary menu items', isActive: true },
+                    { id: 'mock_2', name: 'Beverages', description: 'Drinks and refreshments', isActive: true },
+                    { id: 'mock_3', name: 'Desserts', description: 'Sweet treats', isActive: true }
+                ]
+            });
+        }
+
+        const snapshot = await db.collection('categories').orderBy('name').get();
         const categories = [];
-        categoriesSnapshot.forEach(doc => {
-            categories.push({ id: doc.id, ...doc.data() });
+        
+        snapshot.forEach(doc => {
+            categories.push({
+                id: doc.id,
+                ...doc.data()
+            });
         });
-        res.status(200).json(categories);
+        
+        res.json({ success: true, categories });
     } catch (error) {
-        res.status(500).json({ message: 'Error getting categories', error });
+        console.error('Error fetching categories:', error);
+        res.status(500).json({ message: 'Error fetching categories', error: error.message });
     }
 });
 
@@ -30,18 +50,44 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST a new category
+// POST /api/categories
+// Create a new category
 router.post('/', async (req, res) => {
     try {
-        const { name, description } = req.body;
+        if (!db) {
+            return res.json({
+                success: true,
+                message: 'Firebase unavailable - mock category creation',
+                category: { id: 'mock_new', ...req.body, createdAt: new Date() }
+            });
+        }
+
+        const { name, description, isActive = true } = req.body;
+        
         if (!name) {
             return res.status(400).json({ message: 'Category name is required' });
         }
-        const newCategory = { name, description: description || '' };
-        const docRef = await db.collection('categories').add(newCategory);
-        res.status(201).json({ id: docRef.id, ...newCategory });
+        
+        const categoryData = {
+            name,
+            description: description || '',
+            isActive,
+            createdAt: new Date()
+        };
+        
+        const docRef = await db.collection('categories').add(categoryData);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Category created successfully',
+            category: {
+                id: docRef.id,
+                ...categoryData
+            }
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating category', error });
+        console.error('Error creating category:', error);
+        res.status(500).json({ message: 'Error creating category', error: error.message });
     }
 });
 

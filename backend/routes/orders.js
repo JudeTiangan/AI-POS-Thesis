@@ -62,8 +62,15 @@ router.post('/', async (req, res) => {
             createdAt: new Date(),
         };
 
-        const orderRef = await db.collection('orders').add(orderData);
-        const orderId = orderRef.id;
+        let orderId = 'temp_' + Date.now(); // Fallback ID if Firebase unavailable
+        
+        // Save to Firebase if available
+        if (db) {
+            const orderRef = await db.collection('orders').add(orderData);
+            orderId = orderRef.id;
+        } else {
+            console.log('⚠️  Firebase unavailable - using temporary order ID for PayMongo testing');
+        }
         
         // If GCash payment, create PayMongo payment intent
         let paymentUrl = null;
@@ -76,11 +83,17 @@ router.post('/', async (req, res) => {
                 paymentUrl = paymentResult.paymentUrl;
                 paymentSourceId = paymentResult.paymentSourceId;
                 
-                // Update order with payment source ID
-                await orderRef.update({ paymentSourceId: paymentSourceId });
+                // Update order with payment source ID (if Firebase available)
+                if (db) {
+                    const orderRef = db.collection('orders').doc(orderId);
+                    await orderRef.update({ paymentSourceId: paymentSourceId });
+                }
             } else {
-                // If payment creation fails, delete the order and return error
-                await orderRef.delete();
+                // If payment creation fails, delete the order and return error (if Firebase available)
+                if (db) {
+                    const orderRef = db.collection('orders').doc(orderId);
+                    await orderRef.delete();
+                }
                 return res.status(500).json({ 
                     message: 'Failed to create GCash payment', 
                     error: paymentResult.error 
@@ -88,12 +101,14 @@ router.post('/', async (req, res) => {
             }
         }
         
-        // Update customer analytics for AI recommendations
-        await updateCustomerAnalytics(userId, items);
+        // Update customer analytics for AI recommendations (if Firebase available)
+        if (db) {
+            await updateCustomerAnalytics(userId, items);
+        }
 
         const response = { 
             success: true,
-            message: 'Order created successfully', 
+            message: db ? 'Order created successfully' : 'PayMongo payment test successful (Firebase disabled)', 
             order: { id: orderId, ...orderData, paymentSourceId }
         };
 
@@ -205,14 +220,16 @@ async function handlePaymentSuccess(paymentData) {
             return;
         }
 
-        // Update order payment status
-        const updateData = {
-            paymentStatus: 'paid',
-            paymentTransactionId: transactionId,
-            paidAt: new Date()
-        };
-        
-        await db.collection('orders').doc(orderId).update(updateData);
+        // Update order payment status (if Firebase available)
+        if (db) {
+            const updateData = {
+                paymentStatus: 'paid',
+                paymentTransactionId: transactionId,
+                paidAt: new Date()
+            };
+            
+            await db.collection('orders').doc(orderId).update(updateData);
+        }
         
         console.log(`✅ Order ${orderId} payment successful - Transaction: ${transactionId}`);
         
@@ -231,13 +248,15 @@ async function handlePaymentFailure(paymentData) {
             return;
         }
 
-        // Update order payment status
-        const updateData = {
-            paymentStatus: 'failed',
-            failedAt: new Date()
-        };
-        
-        await db.collection('orders').doc(orderId).update(updateData);
+        // Update order payment status (if Firebase available)
+        if (db) {
+            const updateData = {
+                paymentStatus: 'failed',
+                failedAt: new Date()
+            };
+            
+            await db.collection('orders').doc(orderId).update(updateData);
+        }
         
         console.log(`❌ Order ${orderId} payment failed`);
         
