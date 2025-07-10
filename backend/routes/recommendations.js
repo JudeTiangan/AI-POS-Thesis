@@ -38,6 +38,16 @@ router.post('/', async (req, res) => {
             return res.status(200).json([]); // Return empty if no recommendations found
         }
         
+        if (!db) {
+            // Return mock recommendations when Firebase is unavailable
+            const mockRecommendations = [
+                { id: 'mock_rec_1', name: 'Sugar', categoryId: 'sweeteners', price: 5.00, description: 'Sweet companion for your coffee' },
+                { id: 'mock_rec_2', name: 'Milk', categoryId: 'dairy', price: 8.00, description: 'Fresh milk for creamy drinks' },
+                { id: 'mock_rec_3', name: 'Cookie', categoryId: 'snacks', price: 3.50, description: 'Perfect snack with your beverage' }
+            ];
+            return res.status(200).json(mockRecommendations);
+        }
+        
         const recommendedItems = await Promise.all(
             recommendationIds.map(id => db.collection('items').doc(id).get())
         );
@@ -56,10 +66,26 @@ router.post('/', async (req, res) => {
 async function getGeminiRecommendations(currentCart, userHistory) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+    // Check if Firebase is available
+    if (!db) {
+        console.log("Firebase unavailable, using mock items for Gemini recommendations");
+        const mockItems = [
+            {id: 'mock_1', name: 'Coffee', categoryId: 'beverages'},
+            {id: 'mock_2', name: 'Sugar', categoryId: 'sweeteners'}, 
+            {id: 'mock_3', name: 'Milk', categoryId: 'dairy'}
+        ];
+        // Continue with mock data
+        return generateGeminiResponse(model, mockItems, currentCart, userHistory);
+    }
+
     // TODO: Fetch full item details for the prompt
     const allItemsSnapshot = await db.collection('items').get();
     const allItems = allItemsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
     
+    return generateGeminiResponse(model, allItems, currentCart, userHistory);
+}
+
+async function generateGeminiResponse(model, allItems, currentCart, userHistory) {
     const prompt = `
         You are an expert AI assistant for a Point-of-Sale system in a retail store. 
         Your task is to recommend items to a customer based on their current shopping cart and purchase history.
@@ -100,6 +126,13 @@ async function getGeminiRecommendations(currentCart, userHistory) {
 async function getFallbackRecommendations(currentCart) {
     // Simple fallback: Recommend the 3 most popular (most frequently purchased) items not already in the cart.
     // In a real app, this would be more complex (e.g., pre-defined associations).
+    
+    if (!db) {
+        console.log("Firebase unavailable, using predefined fallback recommendations");
+        const cartItemIds = new Set(currentCart.map(item => item.id));
+        const fallbackItems = ['mock_rec_1', 'mock_rec_2', 'mock_rec_3'];
+        return fallbackItems.filter(id => !cartItemIds.has(id)).slice(0, 3);
+    }
     
     // This is a placeholder for order data. In a real app, you'd query your 'orders' collection.
     const allOrdersSnapshot = await db.collection('orderItems').get(); // Assuming an 'orderItems' collection

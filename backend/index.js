@@ -1,16 +1,38 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
 // Load environment variables from .env file
 require('dotenv').config();
 
-// Debug: Log environment variables to see if they're loaded
-console.log('🔍 DEBUG: Environment variables loaded:');
-console.log('PAYMONGO_SECRET_KEY:', process.env.PAYMONGO_SECRET_KEY ? process.env.PAYMONGO_SECRET_KEY.substring(0, 10) + '...' : 'NOT FOUND');
-console.log('PAYMONGO_PUBLIC_KEY:', process.env.PAYMONGO_PUBLIC_KEY ? process.env.PAYMONGO_PUBLIC_KEY.substring(0, 10) + '...' : 'NOT FOUND');
+// Startup validation and environment checks
+console.log('🚀 Starting AI POS Backend Server...');
+console.log('📊 Environment:', process.env.NODE_ENV || 'development');
 
-// Initialize Firebase Admin SDK
-require('./config/firebase');
+// Validate critical environment variables
+const requiredEnvVars = {
+  PAYMONGO_SECRET_KEY: process.env.PAYMONGO_SECRET_KEY,
+  PAYMONGO_PUBLIC_KEY: process.env.PAYMONGO_PUBLIC_KEY
+};
+
+console.log('🔍 Environment Variables Status:');
+Object.entries(requiredEnvVars).forEach(([key, value]) => {
+  if (value) {
+    console.log(`✅ ${key}: ${value.substring(0, 10)}...`);
+  } else {
+    console.log(`⚠️  ${key}: NOT SET (will use defaults)`);
+  }
+});
+
+// Initialize Firebase Admin SDK (with proper error handling)
+let firebaseInitialized = false;
+try {
+  require('./config/firebase');
+  firebaseInitialized = true;
+  console.log('✅ Firebase configuration loaded successfully');
+} catch (error) {
+  console.log('⚠️  Firebase configuration failed, continuing without Firebase:', error.message);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,7 +72,10 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    firebase: firebaseInitialized ? 'connected' : 'disabled',
+    paymongo: process.env.PAYMONGO_SECRET_KEY ? 'configured' : 'not_configured',
+    version: '1.0.0'
   });
 });
 
@@ -59,10 +84,39 @@ app.get('/', (req, res) => {
   res.send('🧠 AI-Powered POS System Backend - Ready to serve intelligent recommendations!');
 });
 
+// Global error handler for unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit the process in production
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+});
+
+// Global error handler for uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit the process in production
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+});
+
 // Start the server with proper host binding for cloud platforms
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 AI POS Backend server is running on ${HOST}:${PORT}`);
   console.log(`🧠 Features: Market Basket Analysis, Customer Analytics, AI Recommendations`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔥 Firebase: ${firebaseInitialized ? 'Active' : 'Disabled'}`);
+  console.log(`💳 PayMongo: ${process.env.PAYMONGO_SECRET_KEY ? 'Configured' : 'Using Defaults'}`);
   console.log(`🔗 Health check: http://${HOST}:${PORT}/health`);
+  console.log('✅ Server startup completed successfully!');
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  console.error('❌ Server startup error:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use`);
+  }
 }); 

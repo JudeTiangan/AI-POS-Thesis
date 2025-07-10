@@ -1,12 +1,22 @@
 const express = require('express');
-const admin = require('firebase-admin');
 const router = express.Router();
-
-const db = admin.firestore();
+const { db } = require('../config/firebase');
 
 // Get customer analytics for a specific user
 router.get('/customer/:userId', async (req, res) => {
   try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - returning mock customer analytics',
+        customerId: req.params.userId,
+        itemPurchaseFrequency: { 'coffee': 5, 'sugar': 3, 'milk': 2 },
+        totalOrders: 8,
+        averageOrderValue: 45.50,
+        categoryPreferences: { 'beverages': 0.8, 'snacks': 0.3 }
+      });
+    }
+
     const { userId } = req.params;
     
     const analyticsDoc = await db.collection('customerAnalytics').doc(userId).get();
@@ -25,6 +35,18 @@ router.get('/customer/:userId', async (req, res) => {
 // Update customer analytics after a purchase
 router.post('/customer/:userId/purchase', async (req, res) => {
   try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - mock analytics update successful',
+        analytics: {
+          customerId: req.params.userId,
+          totalOrders: 1,
+          lastUpdate: new Date().toISOString()
+        }
+      });
+    }
+
     const { userId } = req.params;
     const { items, totalAmount } = req.body;
     
@@ -64,6 +86,23 @@ router.post('/customer/:userId/purchase', async (req, res) => {
 // Get global analytics and association rules
 router.get('/global', async (req, res) => {
   try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - returning mock global analytics',
+        totalCustomers: 25,
+        totalOrders: 150,
+        totalRevenue: 8750.00,
+        averageOrderValue: 58.33,
+        popularItems: { 'coffee': 45, 'sugar': 30, 'milk': 25, 'pastry': 20 },
+        categoryPreferences: { 'beverages': 65, 'snacks': 35, 'desserts': 15 },
+        associationRules: [
+          { antecedent: 'coffee', consequent: 'sugar', confidence: 0.78, support: 0.45, lift: 2.1 },
+          { antecedent: 'coffee', consequent: 'milk', confidence: 0.65, support: 0.38, lift: 1.8 }
+        ]
+      });
+    }
+
     // Get all customer analytics
     const analyticsSnapshot = await db.collection('customerAnalytics').get();
     
@@ -117,6 +156,19 @@ router.get('/global', async (req, res) => {
 // Get market basket analysis - association rules
 router.get('/association-rules', async (req, res) => {
   try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - returning mock association rules',
+        rules: [
+          { antecedent: 'coffee', consequent: 'sugar', confidence: 0.78, support: 0.45, lift: 2.1 },
+          { antecedent: 'coffee', consequent: 'milk', confidence: 0.65, support: 0.38, lift: 1.8 },
+          { antecedent: 'burger', consequent: 'fries', confidence: 0.82, support: 0.52, lift: 2.3 },
+          { antecedent: 'tea', consequent: 'honey', confidence: 0.71, support: 0.33, lift: 1.9 }
+        ]
+      });
+    }
+
     const rules = await calculateGlobalAssociationRules();
     res.json(rules);
   } catch (error) {
@@ -128,6 +180,20 @@ router.get('/association-rules', async (req, res) => {
 // Calculate popular item combinations
 router.get('/popular-combinations', async (req, res) => {
   try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - returning mock popular combinations',
+        combinations: [
+          { item1: 'Coffee', item2: 'Sugar', frequency: 28 },
+          { item1: 'Burger', item2: 'Fries', frequency: 24 },
+          { item1: 'Coffee', item2: 'Milk', frequency: 22 },
+          { item1: 'Tea', item2: 'Honey', frequency: 18 },
+          { item1: 'Pizza', item2: 'Soda', frequency: 16 }
+        ]
+      });
+    }
+
     const ordersSnapshot = await db.collection('orders').get();
     const orderItemsSnapshot = await db.collection('orderItems').get();
     
@@ -235,6 +301,16 @@ function updateAnalyticsWithPurchase(analytics, items, totalAmount) {
 // Helper function to calculate global association rules
 async function calculateGlobalAssociationRules() {
   try {
+    if (!db) {
+      // Return mock association rules when Firebase is unavailable
+      return [
+        { antecedent: 'Coffee', consequent: 'Sugar', confidence: 0.78, support: 0.45, lift: 2.1 },
+        { antecedent: 'Coffee', consequent: 'Milk', confidence: 0.65, support: 0.38, lift: 1.8 },
+        { antecedent: 'Burger', consequent: 'Fries', confidence: 0.82, support: 0.52, lift: 2.3 },
+        { antecedent: 'Tea', consequent: 'Honey', confidence: 0.71, support: 0.33, lift: 1.9 }
+      ];
+    }
+
     const ordersSnapshot = await db.collection('orders').get();
     const orderItemsSnapshot = await db.collection('orderItems').get();
     
