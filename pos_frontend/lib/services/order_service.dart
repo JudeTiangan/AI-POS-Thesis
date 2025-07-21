@@ -23,7 +23,7 @@ class OrderService {
       print('🔄 Creating order with API: ${ApiConfig.baseUrl}');
       
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/orders'),
+        Uri.parse(ApiConfig.ordersUrl),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -70,23 +70,32 @@ class OrderService {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        print('❌ User not authenticated');
         throw Exception('User not authenticated');
       }
+
+      print('👤 Current user ID: ${user.uid}');
+      print('🔗 API URL: $baseUrl/user/${user.uid}');
 
       final response = await http.get(
         Uri.parse('$baseUrl/user/${user.uid}'),
         headers: {'Content-Type': 'application/json'},
       );
 
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final List<dynamic> ordersData = jsonDecode(response.body);
+        print('✅ Successfully parsed ${ordersData.length} orders');
         return ordersData.map((orderJson) => Order.fromJson(orderJson)).toList();
       } else {
+        print('❌ API error response: ${response.body}');
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Failed to fetch orders');
       }
     } catch (e) {
-      print('Error fetching user orders: $e');
+      print('❌ Error fetching user orders: $e');
       rethrow;
     }
   }
