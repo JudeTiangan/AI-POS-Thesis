@@ -222,9 +222,18 @@ class Order {
     } else if (value is int) {
       // Unix timestamp (milliseconds)
       return DateTime.fromMillisecondsSinceEpoch(value);
+    } else if (value is Map) {
+      // Sometimes JavaScript Date objects come as maps
+      try {
+        return DateTime.parse(value.toString());
+      } catch (e) {
+        print('Error parsing date map: $value');
+        return DateTime.now(); // Fallback to current time
+      }
     }
     
-    return null;
+    print('Unknown date type: ${value.runtimeType} - $value');
+    return DateTime.now(); // Safe fallback
   }
 
   Order copyWith({

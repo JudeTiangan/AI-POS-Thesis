@@ -45,11 +45,48 @@ class OrderService {
 
       if (response.statusCode == 201) {
         final responseData = jsonDecode(response.body);
-        return {
-          'success': true,
-          'order': Order.fromJson(responseData['order']),
-          'paymentUrl': responseData['paymentUrl'], // For GCash payments
-        };
+        print('📋 Response data type: ${responseData.runtimeType}');
+        print('📋 Order data type: ${responseData['order'].runtimeType}');
+        print('📋 Order data: ${responseData['order']}');
+        
+        try {
+          // Ensure the order data is a Map before parsing
+          final orderData = responseData['order'];
+          Order order;
+          
+          if (orderData is Map<String, dynamic>) {
+            order = Order.fromJson(orderData);
+          } else {
+            print('❌ Order data is not a Map, attempting to convert...');
+            // If it's already an Order object, create a new one with an ID
+            final Map<String, dynamic> orderMap = {
+              'id': responseData['order']['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              'userId': responseData['order']['userId'] ?? '',
+              'createdAt': DateTime.now().toIso8601String(),
+              'totalPrice': responseData['order']['totalPrice'] ?? 0.0,
+              'items': responseData['order']['items'] ?? [],
+              'orderType': responseData['order']['orderType'] ?? 'pickup',
+              'orderStatus': responseData['order']['orderStatus'] ?? 'pending',
+              'paymentMethod': responseData['order']['paymentMethod'] ?? 'cash',
+              'paymentStatus': responseData['order']['paymentStatus'] ?? 'pending',
+              'customerName': responseData['order']['customerName'] ?? '',
+              'customerEmail': responseData['order']['customerEmail'] ?? '',
+            };
+            order = Order.fromJson(orderMap);
+          }
+          
+          return {
+            'success': true,
+            'order': order,
+            'paymentUrl': responseData['paymentUrl'], // For GCash payments
+          };
+        } catch (e) {
+          print('❌ Error parsing order response: $e');
+          return {
+            'success': false,
+            'message': 'Failed to parse order response: $e',
+          };
+        }
       } else {
         return {
           'success': false,
