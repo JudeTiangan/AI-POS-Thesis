@@ -66,6 +66,7 @@ router.post('/', async (req, res) => {
             name,
             description: description || '',
             price: parseFloat(price),
+
             categoryId,
             barcode: barcode || null,
             quantity: parseInt(quantity) || 0,
