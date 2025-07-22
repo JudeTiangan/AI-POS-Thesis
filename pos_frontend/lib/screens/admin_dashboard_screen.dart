@@ -145,6 +145,11 @@ class AdminDashboardScreen extends StatelessWidget {
             
             // AI Features Highlight - NOW CLICKABLE!
             _buildAIFeaturesCard(context),
+            
+            const SizedBox(height: 24),
+            
+            // Image Migration Section
+            // _buildImageMigrationCard(context), // Removed
           ],
         ),
       ),
@@ -358,4 +363,6 @@ class AdminDashboardScreen extends StatelessWidget {
       ),
     );
   }
+
+  // Removed: _buildImageMigrationCard and all migration-related methods
 } 

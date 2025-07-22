@@ -165,7 +165,31 @@ class _CashierPOSScreenState extends State<CashierPOSScreen> {
       );
 
       if (result['success']) {
-        final order = Order.fromJson(result['order']);
+        final order = result['order'] as Order; // The order is already an Order object
+        
+        // Auto-complete walk-in orders since they're handled immediately
+        print('🎯 Auto-completing walk-in order: ${order.id}');
+        final statusUpdated = await OrderService.updateOrderStatus(
+          orderId: order.id,
+          orderStatus: OrderStatus.completed,
+          adminNotes: 'Walk-in order completed by cashier ${_authService.currentUser?.email ?? "unknown"}',
+        );
+        
+        // Also mark payment as completed for cash orders
+        bool paymentUpdated = true;
+        if (_selectedPaymentMethod == PaymentMethod.cash) {
+          paymentUpdated = await OrderService.updatePaymentStatus(
+            orderId: order.id,
+            paymentStatus: PaymentStatus.paid,
+            paymentTransactionId: 'CASH_${DateTime.now().millisecondsSinceEpoch}',
+          );
+        }
+        
+        if (statusUpdated && paymentUpdated) {
+          print('✅ Walk-in order auto-completed successfully');
+        } else {
+          print('⚠️ Failed to auto-complete walk-in order, but order was created');
+        }
         
         // Show success and navigate to receipt
         ScaffoldMessenger.of(context).showSnackBar(
@@ -177,7 +201,13 @@ class _CashierPOSScreenState extends State<CashierPOSScreen> {
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => ReceiptScreen(order: order),
+            builder: (context) => ReceiptScreen(order: order.copyWith(
+              orderStatus: OrderStatus.completed, // Update the local order object for display
+              paymentStatus: _selectedPaymentMethod == PaymentMethod.cash 
+                  ? PaymentStatus.paid 
+                  : order.paymentStatus,
+              completedAt: DateTime.now(), // Mark completion time
+            )),
           ),
         );
       } else {

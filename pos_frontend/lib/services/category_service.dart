@@ -8,7 +8,10 @@ class CategoryService {
 
   Future<List<Category>> getCategories() async {
     try {
+      print('🔍 DEBUG: Trying to fetch categories from: $_baseUrl');
       final response = await http.get(Uri.parse(_baseUrl));
+      print('🔍 DEBUG: Response status: ${response.statusCode}');
+      print('🔍 DEBUG: Response body: ${response.body}');
       if (response.statusCode == 200) {
         List<dynamic> body = jsonDecode(response.body);
         List<Category> categories = body.map((dynamic item) => Category.fromJson(item)).toList();

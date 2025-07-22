@@ -5,6 +5,7 @@ import 'package:frontend/firebase_options.dart';
 import 'package:frontend/screens/home_screen.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/screens/admin_dashboard_screen.dart';
+import 'package:frontend/screens/cashier_dashboard_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
@@ -79,6 +80,8 @@ class AuthWrapper extends StatelessWidget {
               }
               if (roleSnapshot.data == 'admin') {
                 return const AdminDashboardScreen();
+              } else if (roleSnapshot.data == 'cashier') {
+                return const CashierDashboardScreen();
               }
               // Default to customer screen
               return const HomeScreen();

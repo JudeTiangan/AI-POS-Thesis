@@ -18,6 +18,7 @@ class OrderService {
     required String customerEmail,
     String? customerPhone,
     DeliveryAddress? deliveryAddress,
+    String? deliveryInstructions,
   }) async {
     try {
       print('🔄 Creating order with API: ${ApiConfig.baseUrl}');
@@ -37,6 +38,7 @@ class OrderService {
           'customerEmail': customerEmail,
           'customerPhone': customerPhone,
           'deliveryAddress': deliveryAddress?.toJson(),
+          'deliveryInstructions': deliveryInstructions,
         }),
       );
 

@@ -3,8 +3,7 @@ import 'package:frontend/models/item.dart';
 import 'package:frontend/services/ai_recommendation_service.dart';
 import 'package:frontend/services/item_service.dart';
 import 'package:frontend/services/cart_service.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:frontend/widgets/product_image_widget.dart';
 
 class RecommendationsWidget extends StatefulWidget {
   final List<Item> currentCart;
@@ -75,77 +74,11 @@ class _RecommendationsWidgetState extends State<RecommendationsWidget> {
   }
 
   Widget _buildRecommendationImage(Item item) {
-    if (item.imageUrl == null || item.imageUrl!.isEmpty) {
-      return Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: Colors.grey[200],
-        ),
-        child: const Icon(Icons.fastfood, size: 32, color: Colors.grey),
-      );
-    }
-
-    try {
-      // Check if it's a base64 image (starts with data:)
-      if (item.imageUrl!.startsWith('data:image') || item.imageUrl!.startsWith('data:application/octet-stream')) {
-        final base64String = item.imageUrl!.split(',')[1];
-        final Uint8List bytes = base64Decode(base64String);
-        return Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey[200],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.memory(
-              bytes,
-              width: 56,
-              height: 56,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.broken_image, size: 32, color: Colors.grey);
-              },
-            ),
-          ),
-        );
-      } else {
-        // Fallback to network image
-        return Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey[200],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              item.imageUrl!,
-              width: 56,
-              height: 56,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.broken_image, size: 32, color: Colors.grey);
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      return Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: Colors.grey[200],
-        ),
-        child: const Icon(Icons.broken_image, size: 32, color: Colors.grey),
-      );
-    }
+    return ProductThumbnail(
+      imageUrl: item.imageUrl,
+      size: 56,
+      borderRadius: BorderRadius.circular(8),
+    );
   }
 
   @override

@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/models/item.dart';
 import 'package:frontend/models/category.dart';
 import 'package:frontend/services/item_service.dart';
 import 'package:frontend/services/category_service.dart';
+import 'package:frontend/widgets/product_image_widget.dart';
 
 class ManageItemsScreen extends StatefulWidget {
   const ManageItemsScreen({super.key});
@@ -34,52 +34,11 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
     });
   }
 
-  Widget _buildItemImage(String imageUrl) {
-    // Add debugging to see what we're working with
-    print('DEBUG: Image URL: ${imageUrl.length > 50 ? imageUrl.substring(0, 50) + "..." : imageUrl}');
-    
-    try {
-      // Check for base64 image with more flexible detection
-      if (imageUrl.startsWith('data:image') || imageUrl.startsWith('data:application/octet-stream')) {
-        print('DEBUG: Detected base64 image');
-        // Handle base64 image
-        final parts = imageUrl.split(',');
-        if (parts.length == 2) {
-          final base64String = parts[1];
-          final bytes = base64Decode(base64String);
-          print('DEBUG: Successfully decoded base64, size: ${bytes.length} bytes');
-          return Image.memory(
-            bytes,
-            width: 50,
-            height: 50,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              print('DEBUG: Error displaying base64 image: $error');
-              return const Icon(Icons.broken_image, size: 50, color: Colors.red);
-            },
-          );
-        } else {
-          print('DEBUG: Invalid base64 format - missing comma separator');
-          return const Icon(Icons.error, size: 50, color: Colors.orange);
-        }
-      } else {
-        print('DEBUG: Attempting network image');
-        // Handle network image (fallback)
-        return Image.network(
-          imageUrl,
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            print('DEBUG: Network image error: $error');
-            return const Icon(Icons.wifi_off, size: 50, color: Colors.grey);
-          },
-        );
-      }
-    } catch (e) {
-      print('DEBUG: Exception in _buildItemImage: $e');
-      return const Icon(Icons.error, size: 50, color: Colors.red);
-    }
+  Widget _buildItemImage(String? imageUrl) {
+    return ProductThumbnail(
+      imageUrl: imageUrl,
+      size: 50,
+    );
   }
 
   @override
@@ -105,9 +64,7 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
             itemBuilder: (context, index) {
               final item = items[index];
               return ListTile(
-                leading: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                    ? _buildItemImage(item.imageUrl!)
-                    : const Icon(Icons.image, size: 50),
+                leading: _buildItemImage(item.imageUrl),
                 title: Text(item.name),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,50 +322,11 @@ class __ItemDialogState extends State<_ItemDialog> {
     );
   }
 
-  Widget _buildDialogImage(String imageUrl) {
-    print('DEBUG Dialog: Image URL: ${imageUrl.length > 50 ? imageUrl.substring(0, 50) + "..." : imageUrl}');
-    
-    try {
-      // Check for base64 image with more flexible detection
-      if (imageUrl.startsWith('data:image') || imageUrl.startsWith('data:application/octet-stream')) {
-        print('DEBUG Dialog: Detected base64 image');
-        // Handle base64 image
-        final parts = imageUrl.split(',');
-        if (parts.length == 2) {
-          final base64String = parts[1];
-          final bytes = base64Decode(base64String);
-          print('DEBUG Dialog: Successfully decoded base64, size: ${bytes.length} bytes');
-          return Image.memory(
-            bytes,
-            width: 100,
-            height: 100,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              print('DEBUG Dialog: Error displaying base64 image: $error');
-              return const Icon(Icons.broken_image, size: 100, color: Colors.red);
-            },
-          );
-        } else {
-          print('DEBUG Dialog: Invalid base64 format - missing comma separator');
-          return const Icon(Icons.error, size: 100, color: Colors.orange);
-        }
-      } else {
-        print('DEBUG Dialog: Attempting network image');
-        // Handle network image (fallback)
-        return Image.network(
-          imageUrl,
-          width: 100,
-          height: 100,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            print('DEBUG Dialog: Network image error: $error');
-            return const Icon(Icons.wifi_off, size: 100, color: Colors.grey);
-          },
-        );
-      }
-    } catch (e) {
-      print('DEBUG Dialog: Exception in _buildDialogImage: $e');
-      return const Icon(Icons.error, size: 100, color: Colors.red);
-    }
+  Widget _buildDialogImage(String? imageUrl) {
+    return ProductImageDisplay(
+      imageUrl: imageUrl,
+      width: 100,
+      height: 100,
+    );
   }
 } 

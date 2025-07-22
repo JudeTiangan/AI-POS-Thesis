@@ -1,0 +1,68 @@
+[
+  {
+    "id": "item1",
+    "name": "Espresso Coffee",
+    "price": 120.00,
+    "category": "Food & Beverages",
+    "categoryId": "cat1",
+    "description": "Premium espresso blend",
+    "quantity": 50,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "item2",
+    "name": "Cappuccino",
+    "price": 150.00,
+    "category": "Food & Beverages", 
+    "categoryId": "cat1",
+    "description": "Classic cappuccino with steamed milk",
+    "quantity": 40,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "item3",
+    "name": "Chicken Sandwich",
+    "price": 250.00,
+    "category": "Food & Beverages",
+    "categoryId": "cat1", 
+    "description": "Grilled chicken sandwich with lettuce and tomato",
+    "quantity": 30,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "item4",
+    "name": "Smartphone",
+    "price": 25000.00,
+    "category": "Electronics",
+    "categoryId": "cat2",
+    "description": "Latest Android smartphone",
+    "quantity": 15,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "item5",
+    "name": "Wireless Headphones",
+    "price": 3500.00,
+    "category": "Electronics",
+    "categoryId": "cat2",
+    "description": "Bluetooth wireless headphones",
+    "quantity": 25,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "item6",
+    "name": "Cotton T-Shirt",
+    "price": 500.00,
+    "category": "Clothing",
+    "categoryId": "cat3",
+    "description": "100% cotton t-shirt, various sizes",
+    "quantity": 100,
+    "imageUrl": "",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  }
+] 

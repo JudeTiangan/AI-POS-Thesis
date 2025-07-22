@@ -20,7 +20,9 @@ class AuthService {
     required String name,
   }) async {
     try {
-      // First, we call our backend to create the user in Firebase Auth and in our Firestore db
+      print('🔄 Registering user: $email');
+      
+      // Call our backend to create the user in Firebase Auth and Firestore
       final response = await http.post(
         Uri.parse('$_baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
@@ -31,25 +33,38 @@ class AuthService {
         }),
       );
 
+      print('📡 Backend response: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
       if (response.statusCode == 201) {
-        // If backend is successful, we then sign in the user on the client-side
-        // This is necessary to get the user's session state on the device.
-        UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        return userCredential;
+        print('✅ Backend registration successful');
+        
+        // Backend has created the user in Firebase Auth, now sign in
+        try {
+          UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+          print('✅ User signed in successfully');
+          return userCredential;
+        } catch (signInError) {
+          print('❌ Sign in error after registration: $signInError');
+          throw Exception('Account created but sign-in failed. Please try signing in manually.');
+        }
       } else {
-        // Handle backend errors (e.g., email already exists)
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to register');
+        // Handle backend errors
+        try {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Failed to register');
+        } catch (parseError) {
+          throw Exception('Registration failed: ${response.body}');
+        }
       }
     } on FirebaseAuthException catch (e) {
-      // This will catch client-side sign-in errors, though most errors should be caught by the backend.
-      print('FirebaseAuthException on signUp: ${e.message}');
-      throw Exception(e.message);
+      print('❌ FirebaseAuthException on signUp: ${e.message}');
+      throw Exception(e.message ?? 'Firebase authentication error');
     } catch (e) {
-      print('Generic error on signUp: $e');
+      print('❌ Generic error on signUp: $e');
       rethrow;
     }
   }

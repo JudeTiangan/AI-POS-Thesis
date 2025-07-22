@@ -5,35 +5,36 @@ const { db } = require('../config/firebase');
 // GET /api/categories
 // Get all categories
 router.get('/', async (req, res) => {
+  try {
+    console.log('📂 GET /categories - Fetching all categories');
+    const categoriesSnapshot = await db.collection('categories').get();
+    const categories = categoriesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`📂 Successfully fetched ${categories.length} categories`);
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    
+    // DEMO FALLBACK: Use local JSON data when Firebase fails
     try {
-        if (!db) {
-            // Fallback response when Firebase is unavailable
-            return res.json({
-                success: true,
-                message: 'Firebase unavailable - returning mock categories for testing',
-                categories: [
-                    { id: 'mock_1', name: 'Main Dishes', description: 'Primary menu items', isActive: true },
-                    { id: 'mock_2', name: 'Beverages', description: 'Drinks and refreshments', isActive: true },
-                    { id: 'mock_3', name: 'Desserts', description: 'Sweet treats', isActive: true }
-                ]
-            });
-        }
-
-        const snapshot = await db.collection('categories').orderBy('name').get();
-        const categories = [];
-        
-        snapshot.forEach(doc => {
-            categories.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
-        
-        res.json({ success: true, categories });
-    } catch (error) {
-        console.error('Error fetching categories:', error);
-        res.status(500).json({ message: 'Error fetching categories', error: error.message });
+      const fs = require('fs');
+      const path = require('path');
+      const localCategories = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '../data/categories.json'), 'utf8')
+      );
+      console.log('🔄 Using local JSON data for demo (Firebase unavailable)');
+      res.json(localCategories);
+    } catch (fallbackError) {
+      console.error('Failed to load local categories:', fallbackError);
+      res.status(500).json({ 
+        message: 'Error fetching categories', 
+        error: error.message 
+      });
     }
+  }
 });
 
 // GET a single category by ID

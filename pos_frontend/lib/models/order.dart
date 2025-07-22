@@ -92,6 +92,7 @@ class Order {
   final PaymentMethod paymentMethod;
   final PaymentStatus paymentStatus;
   final DeliveryAddress? deliveryAddress;
+  final String? deliveryInstructions;
   final DateTime? estimatedReadyTime;
   final DateTime? completedAt;
   final String? paymentTransactionId;
@@ -114,6 +115,7 @@ class Order {
     required this.customerName,
     required this.customerEmail,
     this.deliveryAddress,
+    this.deliveryInstructions,
     this.estimatedReadyTime,
     this.completedAt,
     this.paymentTransactionId,
@@ -154,6 +156,7 @@ class Order {
       'paymentMethod': paymentMethod.name,
       'paymentStatus': paymentStatus.name,
       'deliveryAddress': deliveryAddress?.toJson(),
+      'deliveryInstructions': deliveryInstructions,
       'estimatedReadyTime': estimatedReadyTime != null ? Timestamp.fromDate(estimatedReadyTime!) : null,
       'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
       'paymentTransactionId': paymentTransactionId,
@@ -193,6 +196,7 @@ class Order {
       deliveryAddress: json['deliveryAddress'] != null 
           ? DeliveryAddress.fromJson(json['deliveryAddress'] as Map<String, dynamic>)
           : null,
+      deliveryInstructions: json['deliveryInstructions'],
       estimatedReadyTime: _parseDateTime(json['estimatedReadyTime']),
       completedAt: _parseDateTime(json['completedAt']),
       paymentTransactionId: json['paymentTransactionId'],
@@ -223,11 +227,28 @@ class Order {
       // Unix timestamp (milliseconds)
       return DateTime.fromMillisecondsSinceEpoch(value);
     } else if (value is Map) {
-      // Sometimes JavaScript Date objects come as maps
+      // Handle Firestore Timestamp objects that come as maps
       try {
-        return DateTime.parse(value.toString());
+        if (value.containsKey('_seconds') && value.containsKey('_nanoseconds')) {
+          // Firestore Timestamp map format: {_seconds: int, _nanoseconds: int}
+          final seconds = value['_seconds'] as int;
+          final nanoseconds = value['_nanoseconds'] as int;
+          return DateTime.fromMillisecondsSinceEpoch(
+            seconds * 1000 + (nanoseconds / 1000000).round()
+          );
+        } else if (value.containsKey('seconds') && value.containsKey('nanoseconds')) {
+          // Alternative Firestore format: {seconds: int, nanoseconds: int}
+          final seconds = value['seconds'] as int;
+          final nanoseconds = value['nanoseconds'] as int;
+          return DateTime.fromMillisecondsSinceEpoch(
+            seconds * 1000 + (nanoseconds / 1000000).round()
+          );
+        } else {
+          // Try to parse as string representation
+          return DateTime.parse(value.toString());
+        }
       } catch (e) {
-        print('Error parsing date map: $value');
+        print('Error parsing date map: $value - $e');
         return DateTime.now(); // Fallback to current time
       }
     }
@@ -247,6 +268,7 @@ class Order {
     PaymentMethod? paymentMethod,
     PaymentStatus? paymentStatus,
     DeliveryAddress? deliveryAddress,
+    String? deliveryInstructions,
     DateTime? estimatedReadyTime,
     DateTime? completedAt,
     String? paymentTransactionId,
@@ -267,6 +289,7 @@ class Order {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      deliveryInstructions: deliveryInstructions ?? this.deliveryInstructions,
       estimatedReadyTime: estimatedReadyTime ?? this.estimatedReadyTime,
       completedAt: completedAt ?? this.completedAt,
       paymentTransactionId: paymentTransactionId ?? this.paymentTransactionId,

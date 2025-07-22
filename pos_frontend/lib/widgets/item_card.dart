@@ -1,47 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/item.dart';
 import 'package:frontend/services/cart_service.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:frontend/widgets/product_image_widget.dart';
 
 class ItemCard extends StatelessWidget {
   final Item item;
 
   const ItemCard({super.key, required this.item});
 
-  // Helper method to build image widget from base64 string
+  // Helper method to build image widget using ProductImageWidget
   Widget _buildItemImage() {
-    if (item.imageUrl == null || item.imageUrl!.isEmpty) {
-      return const Icon(Icons.image_not_supported, size: 40, color: Colors.grey);
-    }
-
-    try {
-      // Check if it's a base64 image (starts with data:)
-      if (item.imageUrl!.startsWith('data:image') || item.imageUrl!.startsWith('data:application/octet-stream')) {
-        final base64String = item.imageUrl!.split(',')[1];
-        final Uint8List bytes = base64Decode(base64String);
-        return Image.memory(
-          bytes,
-          key: ValueKey('image_${item.id}'), // Add unique key for caching
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(Icons.broken_image, size: 40);
-          },
-        );
-      } else {
-        // Fallback to network image for any non-base64 images
-        return Image.network(
-          item.imageUrl!,
-          key: ValueKey('image_${item.id}'), // Add unique key for caching
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(Icons.broken_image, size: 40);
-          },
-        );
-      }
-    } catch (e) {
-      return const Icon(Icons.broken_image, size: 40);
-    }
+    return ProductCardImage(
+      imageUrl: item.imageUrl,
+      height: 80,
+    );
   }
 
   @override

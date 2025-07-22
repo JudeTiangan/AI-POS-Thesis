@@ -112,7 +112,6 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
 
     if (confirmed == true) {
       try {
-        print('🗑️ Deleting order: ${order.id} with status: ${order.orderStatus.name}');
         final success = await OrderService.deleteOrder(order.id);
         
         if (success) {
@@ -133,7 +132,6 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
           );
         }
       } catch (e) {
-        print('❌ Exception in _deleteOrder: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error deleting order: $e'),
@@ -440,9 +438,15 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
                       _buildInfoRow('Payment Method', order.paymentMethod.name.toUpperCase()),
                       _buildInfoRow('Payment Status', order.paymentStatus.name.toUpperCase()),
                       _buildInfoRow('Total Amount', '₱${order.totalPrice.toStringAsFixed(2)}'),
-                      if (order.deliveryAddress != null)
-                        _buildInfoRow('Delivery Address', 
-                          '${order.deliveryAddress!.street}, ${order.deliveryAddress!.city}'),
+                      if (order.deliveryAddress != null) ...[
+                        _buildDeliveryAddressSection(order.deliveryAddress!),
+                      ],
+                      // Always show delivery instructions section for delivery orders
+                      if (order.orderType == OrderType.delivery) ...[
+                        _buildDeliveryInstructionsSection(
+                          order.deliveryInstructions ?? 'No special delivery instructions provided'
+                        ),
+                      ],
                     ]),
                     
                     // Order Actions
@@ -508,7 +512,118 @@ class _AdminOrderManagementScreenState extends State<AdminOrderManagementScreen>
     );
   }
 
-  Widget _buildItemRow(OrderItem item) {
+  Widget _buildDeliveryAddressSection(DeliveryAddress address) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Delivery Address:',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                address.street,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                '${address.city}, ${address.province}',
+                style: const TextStyle(
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                'Postal Code: ${address.postalCode}',
+                style: const TextStyle(
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                'Contact: ${address.contactNumber}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+              if (address.landmarks != null && address.landmarks!.isNotEmpty)
+                Text(
+                  'Landmarks: ${address.landmarks}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeliveryInstructionsSection(String instructions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Delivery Instructions:',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.notes,
+                size: 16,
+                color: Colors.orange.shade700,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  instructions,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.orange.shade800,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+    Widget _buildItemRow(OrderItem item) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(

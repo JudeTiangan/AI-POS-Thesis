@@ -23,7 +23,9 @@ pos_frontend/ios/firebase_app_id_file.json
 pos_frontend/android/app/google-services.json
 pos_frontend/ios/Runner/GoogleService-Info.plist
 backend/config/serviceAccountKey.json
+backend/config/serviceAccountKey.json.json
 **/serviceAccountKey.json
+**/serviceAccountKey.json.json
 **/*.pem
 **/*.key
 

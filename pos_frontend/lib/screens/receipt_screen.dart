@@ -225,6 +225,43 @@ class ReceiptScreen extends StatelessWidget {
             ),
           ),
         ],
+        
+        // Delivery Instructions (if applicable)
+        if (order.orderType == OrderType.delivery) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'Delivery Instructions',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.notes, size: 16, color: Colors.orange[700]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    order.deliveryInstructions ?? 'No special delivery instructions provided',
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.orange[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

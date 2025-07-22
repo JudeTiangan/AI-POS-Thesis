@@ -17,6 +17,7 @@ router.post('/', async (req, res) => {
             orderType, 
             paymentMethod, 
             deliveryAddress,
+            deliveryInstructions,
             customerName,
             customerEmail,
             customerPhone
@@ -25,6 +26,11 @@ router.post('/', async (req, res) => {
         // Validate required fields
         if (!userId || !items || !totalPrice || !orderType || !paymentMethod || !customerName || !customerEmail) {
             return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        // Debug delivery instructions (simplified)
+        if (orderType === 'delivery') {
+            console.log('✅ DELIVERY INSTRUCTIONS:', deliveryInstructions);
         }
 
         // Validate delivery address for delivery orders
@@ -51,6 +57,7 @@ router.post('/', async (req, res) => {
             paymentMethod: paymentMethod,
             paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending', // GCash will be updated after payment
             deliveryAddress: deliveryAddress || null,
+            deliveryInstructions: deliveryInstructions !== undefined ? deliveryInstructions : null,
             estimatedReadyTime: null, // Will be set by admin
             completedAt: null,
             paymentTransactionId: null, // Will be set after payment

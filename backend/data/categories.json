@@ -1,0 +1,20 @@
+[
+  {
+    "id": "cat1",
+    "name": "Food & Beverages",
+    "description": "Food and drink items for restaurant",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "cat2", 
+    "name": "Electronics",
+    "description": "Electronic devices and gadgets",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  },
+  {
+    "id": "cat3",
+    "name": "Clothing",
+    "description": "Apparel and accessories",
+    "createdAt": "2024-01-15T08:00:00.000Z"
+  }
+] 

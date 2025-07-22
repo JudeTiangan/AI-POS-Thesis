@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:frontend/models/item.dart';
 import 'package:frontend/services/api_config.dart';
+import 'package:frontend/services/firebase_storage_service.dart';
 
 class ItemService {
   final String _baseUrl = ApiConfig.itemsUrl;
@@ -26,39 +27,76 @@ class ItemService {
   // Handles creating a new item, with an optional image file
   Future<Item> addItem({required Item item, File? imageFile}) async {
     try {
-      print('Adding item with image: ${imageFile != null ? imageFile.path : 'no image'}');
-      var request = http.MultipartRequest('POST', Uri.parse(_baseUrl));
+      print('🔄 Adding item with Firebase Storage: ${imageFile != null ? imageFile.path : 'no image'}');
       
-      // Add text fields
-      request.fields['name'] = item.name;
-      request.fields['description'] = item.description;
-      request.fields['price'] = item.price.toString();
-      request.fields['categoryId'] = item.categoryId;
-      request.fields['quantity'] = item.quantity.toString();
-      if (item.barcode != null) {
-        request.fields['barcode'] = item.barcode!;
-      }
+      // First, create the item without image to get an ID
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': item.name,
+          'description': item.description,
+          'price': item.price,
+          'categoryId': item.categoryId,
+          'quantity': item.quantity,
+          'barcode': item.barcode,
+          'imageUrl': null, // Will be updated after image upload
+        }),
+      );
 
-      // Add image file if it exists
-      if (imageFile != null) {
-        print('Adding image file to request: ${imageFile.path}');
-        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-      }
+      print('📋 Item creation response: ${response.statusCode}');
 
-      print('Sending request to: $_baseUrl');
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        return Item.fromJson(jsonDecode(response.body));
-      } else {
+      if (response.statusCode != 201) {
         throw 'Failed to add item. Status: ${response.statusCode}, Body: ${response.body}';
       }
+
+      final createdItem = Item.fromJson(jsonDecode(response.body));
+      print('✅ Item created with ID: ${createdItem.id}');
+
+      // If there's an image, upload it to Firebase Storage
+      if (imageFile != null && createdItem.id != null) {
+        print('🖼️ Uploading image to Firebase Storage...');
+        final imageUrl = await FirebaseStorageService.uploadProductImage(
+          itemId: createdItem.id!,
+          imageFile: imageFile,
+        );
+
+        if (imageUrl != null) {
+          print('✅ Image uploaded, updating item with URL: $imageUrl');
+          // Update the item with the image URL
+          await updateItem(
+            id: createdItem.id!,
+            item: Item(
+              id: createdItem.id,
+              name: createdItem.name,
+              description: createdItem.description,
+              price: createdItem.price,
+              categoryId: createdItem.categoryId,
+              quantity: createdItem.quantity,
+              barcode: createdItem.barcode,
+              imageUrl: imageUrl,
+            ),
+          );
+
+          // Return the item with the image URL
+          return Item(
+            id: createdItem.id,
+            name: createdItem.name,
+            description: createdItem.description,
+            price: createdItem.price,
+            categoryId: createdItem.categoryId,
+            quantity: createdItem.quantity,
+            barcode: createdItem.barcode,
+            imageUrl: imageUrl,
+          );
+        } else {
+          print('⚠️ Image upload failed, but item was created');
+        }
+      }
+
+      return createdItem;
     } catch (e) {
-      print('Error in addItem: $e');
+      print('❌ Error in addItem: $e');
       throw e.toString();
     }
   }
@@ -66,43 +104,69 @@ class ItemService {
   // Handles updating an item, with an optional new image
   Future<void> updateItem({required String id, required Item item, File? imageFile}) async {
     try {
-       var request = http.MultipartRequest('PUT', Uri.parse('$_baseUrl/$id'));
-
-      // Add text fields
-      request.fields['name'] = item.name;
-      request.fields['description'] = item.description;
-      request.fields['price'] = item.price.toString();
-      request.fields['categoryId'] = item.categoryId;
-      request.fields['quantity'] = item.quantity.toString();
-       if (item.barcode != null) {
-        request.fields['barcode'] = item.barcode!;
-      }
-
-      // Add image file if it exists
+      print('🔄 Updating item $id with Firebase Storage');
+      
+      String? imageUrl = item.imageUrl; // Keep existing image URL if no new image
+      
+      // If there's a new image, upload it to Firebase Storage
       if (imageFile != null) {
-        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+        print('🖼️ Uploading new image to Firebase Storage...');
+        imageUrl = await FirebaseStorageService.uploadProductImage(
+          itemId: id,
+          imageFile: imageFile,
+        );
+        
+        if (imageUrl != null) {
+          print('✅ Image uploaded successfully: $imageUrl');
+        } else {
+          print('⚠️ Image upload failed, keeping existing image');
+          imageUrl = item.imageUrl; // Keep existing image if upload fails
+        }
       }
 
-      var streamedResponse = await request.send();
-       var response = await http.Response.fromStream(streamedResponse);
+      // Update the item with JSON body
+      final response = await http.put(
+        Uri.parse('$_baseUrl/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': item.name,
+          'description': item.description,
+          'price': item.price,
+          'categoryId': item.categoryId,
+          'quantity': item.quantity,
+          'barcode': item.barcode,
+          'imageUrl': imageUrl,
+        }),
+      );
+
+      print('📋 Item update response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         throw 'Failed to update item. Status: ${response.statusCode}, Body: ${response.body}';
       }
+
+      print('✅ Item updated successfully');
     } catch (e) {
-      print('Error in updateItem: $e');
+      print('❌ Error in updateItem: $e');
       throw e.toString();
     }
   }
 
   Future<void> deleteItem(String id) async {
     try {
+      print('🗑️ Deleting item $id and associated image');
+      
+      // Delete the item from the backend
       final response = await http.delete(Uri.parse('$_baseUrl/$id'));
       if (response.statusCode != 200) {
         throw 'Failed to delete item';
       }
+      
+      // Also delete the image from Firebase Storage
+      await FirebaseStorageService.deleteProductImage(id);
+      print('✅ Item and image deleted successfully');
     } catch (e) {
-      print('Error in deleteItem: $e');
+      print('❌ Error in deleteItem: $e');
       throw e.toString();
     }
   }

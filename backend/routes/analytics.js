@@ -251,6 +251,68 @@ router.get('/popular-combinations', async (req, res) => {
   }
 });
 
+// Get today's analytics for dashboard
+router.get('/today', async (req, res) => {
+  try {
+    if (!db) {
+      return res.json({
+        success: true,
+        message: 'Firebase unavailable - returning mock today analytics',
+        todayOrders: 5,
+        todaySales: 1250.00,
+        pendingOrders: 2
+      });
+    }
+
+    // Get today's date range
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1); // Tomorrow start = today end
+
+    console.log('📅 Fetching analytics for today:', todayStart.toISOString(), 'to', todayEnd.toISOString());
+
+    // Query orders for today
+    const todayOrdersSnapshot = await db.collection('orders')
+      .where('createdAt', '>=', todayStart)
+      .where('createdAt', '<', todayEnd)
+      .get();
+
+    let todayOrders = 0;
+    let todaySales = 0.0;
+    let pendingOrders = 0;
+
+    todayOrdersSnapshot.docs.forEach(doc => {
+      const order = doc.data();
+      todayOrders++;
+      todaySales += order.totalPrice || 0;
+      
+      // Count pending orders (pending or preparing)
+      if (order.orderStatus === 'pending' || order.orderStatus === 'preparing') {
+        pendingOrders++;
+      }
+    });
+
+    console.log('📊 Today\'s Analytics Calculated:', {
+      todayOrders,
+      todaySales,
+      pendingOrders
+    });
+
+    res.json({
+      success: true,
+      todayOrders,
+      todaySales,
+      pendingOrders,
+      date: todayStart.toISOString().split('T')[0] // YYYY-MM-DD format
+    });
+
+  } catch (error) {
+    console.error('Error fetching today\'s analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch today\'s analytics' });
+  }
+});
+
 // Helper function to update analytics with new purchase
 function updateAnalyticsWithPurchase(analytics, items, totalAmount) {
   const updatedFrequency = { ...analytics.itemPurchaseFrequency };

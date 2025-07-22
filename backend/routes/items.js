@@ -12,57 +12,41 @@ const upload = multer({
 // GET /api/items
 // Get all items
 router.get('/', async (req, res) => {
-    try {
-        if (!db) {
-            // Fallback response when Firebase is unavailable
-            return res.json({
-                success: true,
-                message: 'Firebase unavailable - returning mock items for testing',
-                items: [
-                    {
-                        id: 'mock_1',
-                        name: 'Sample Burger',
-                        description: 'Delicious test burger',
-                        price: 25.00,
-                        category: 'Main Dishes',
-                        isActive: true,
-                        imageUrl: null,
-                        stock: 50
-                    },
-                    {
-                        id: 'mock_2', 
-                        name: 'Test Coffee',
-                        description: 'Premium test coffee',
-                        price: 15.00,
-                        category: 'Beverages',
-                        isActive: true,
-                        imageUrl: null,
-                        stock: 100
-                    }
-                ]
-            });
-        }
-
-        const snapshot = await db.collection('items').orderBy('name').get();
-        const items = [];
-        
-        snapshot.forEach(doc => {
-            items.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
-        
-        res.json({ success: true, items });
+  try {
+    console.log('📦 GET /items - Fetching all items');
+    const itemsSnapshot = await db.collection('items').get();
+    const items = itemsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`📦 Successfully fetched ${items.length} items`);
+    res.json(items);
     } catch (error) {
-        console.error('Error fetching items:', error);
-        res.status(500).json({ message: 'Error fetching items', error: error.message });
+    console.error('Error fetching items:', error);
+    
+    // DEMO FALLBACK: Use local JSON data when Firebase fails
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const localItems = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '../data/items.json'), 'utf8')
+      );
+      console.log('🔄 Using local JSON data for demo (Firebase unavailable)');
+      res.json(localItems);
+    } catch (fallbackError) {
+      console.error('Failed to load local items:', fallbackError);
+      res.status(500).json({ 
+        message: 'Error fetching items', 
+        error: error.message 
+      });
     }
+  }
 });
 
 // POST /api/items
-// Create a new item
-router.post('/', upload.single('image'), async (req, res) => {
+// Create a new item (updated for Firebase Storage + JSON)
+router.post('/', async (req, res) => {
     try {
         if (!db) {
             return res.json({
@@ -72,35 +56,37 @@ router.post('/', upload.single('image'), async (req, res) => {
             });
         }
 
-        const { name, description, price, category, stock } = req.body;
+        const { name, description, price, categoryId, barcode, quantity, imageUrl } = req.body;
         
-        if (!name || !price || !category) {
-            return res.status(400).json({ message: 'Name, price, and category are required' });
+        if (!name || !price || !categoryId) {
+            return res.status(400).json({ message: 'Name, price, and categoryId are required' });
         }
         
         const itemData = {
             name,
             description: description || '',
             price: parseFloat(price),
-            category,
-            stock: parseInt(stock) || 0,
+            categoryId,
+            barcode: barcode || null,
+            quantity: parseInt(quantity) || 0,
+            imageUrl: imageUrl || null,
             isActive: true,
-            imageUrl: null, // Will be updated if image upload is implemented
             createdAt: new Date()
         };
         
+        console.log('📦 Creating item:', itemData);
         const docRef = await db.collection('items').add(itemData);
         
-        res.status(201).json({
-            success: true,
-            message: 'Item created successfully',
-            item: {
-                id: docRef.id,
-                ...itemData
-            }
-        });
+        const responseItem = {
+            id: docRef.id,
+            ...itemData
+        };
+        
+        console.log('✅ Item created successfully:', responseItem);
+        res.status(201).json(responseItem);
+        
     } catch (error) {
-        console.error('Error creating item:', error);
+        console.error('❌ Error creating item:', error);
         res.status(500).json({ message: 'Error creating item', error: error.message });
     }
 });
@@ -119,22 +105,17 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// PUT to update an item by ID
-router.put('/:id', upload.single('image'), async (req, res) => {
+// PUT to update an item by ID (updated for Firebase Storage + JSON)
+router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, categoryId, barcode, quantity } = req.body;
+        const { name, description, price, categoryId, barcode, quantity, imageUrl } = req.body;
 
         const itemRef = db.collection('items').doc(id);
         const itemDoc = await itemRef.get();
 
         if (!itemDoc.exists) {
             return res.status(404).json({ message: 'Item not found' });
-        }
-        
-        let imageUrl = itemDoc.data().imageUrl; // Keep old image if new one isn't provided
-        if (req.file) {
-            imageUrl = convertImageToBase64(req.file);
         }
 
         const updatedData = {
@@ -144,13 +125,18 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             categoryId: categoryId || itemDoc.data().categoryId,
             barcode: barcode || itemDoc.data().barcode,
             quantity: quantity !== undefined ? parseInt(quantity) : itemDoc.data().quantity || 0,
-            imageUrl
+            imageUrl: imageUrl !== undefined ? imageUrl : itemDoc.data().imageUrl,
+            updatedAt: new Date()
         };
 
+        console.log('🔄 Updating item:', id, updatedData);
         await itemRef.update(updatedData);
+        
+        console.log('✅ Item updated successfully:', id);
         res.status(200).json({ message: `Item ${id} updated successfully` });
 
     } catch (error) {
+        console.error('❌ Error updating item:', error);
         res.status(500).json({ message: 'Error updating item', error: error.message });
     }
 });

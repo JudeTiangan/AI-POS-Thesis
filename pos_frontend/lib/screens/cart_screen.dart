@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:frontend/services/cart_service.dart';
 import 'package:frontend/services/auth_service.dart';
@@ -9,7 +8,7 @@ import 'package:frontend/services/order_service.dart';
 import 'package:frontend/services/payment_service.dart';
 import 'package:frontend/screens/receipt_screen.dart';
 import 'package:frontend/widgets/recommendations_widget.dart';
-import 'dart:convert';
+import 'package:frontend/widgets/product_image_widget.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -34,6 +33,7 @@ class _CartScreenState extends State<CartScreen> {
   final _provinceController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _landmarksController = TextEditingController();
+  final _deliveryInstructionsController = TextEditingController();
   
   OrderType _selectedOrderType = OrderType.pickup;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cash;
@@ -66,52 +66,17 @@ class _CartScreenState extends State<CartScreen> {
     _provinceController.dispose();
     _postalCodeController.dispose();
     _landmarksController.dispose();
+    _deliveryInstructionsController.dispose();
     super.dispose();
   }
 
   // Helper method to build image widget for cart items
   Widget _buildItemImage(String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return const Icon(Icons.fastfood, size: 30, color: Colors.grey);
-    }
-
-    try {
-      // Check if it's a base64 image (starts with data:)
-      if (imageUrl.startsWith('data:image') || imageUrl.startsWith('data:application/octet-stream')) {
-        final base64String = imageUrl.split(',')[1];
-        final Uint8List bytes = base64Decode(base64String);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.fastfood, size: 30, color: Colors.grey);
-            },
-          ),
-        );
-      } else {
-        // Fallback to network image for any non-base64 images
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.fastfood, size: 30, color: Colors.grey);
-            },
-          ),
-        );
-      }
-    } catch (e) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          color: Colors.grey[100],
-          child: const Icon(Icons.broken_image, size: 30, color: Colors.grey),
-        ),
-      );
-    }
+    return ProductThumbnail(
+      imageUrl: imageUrl,
+      size: 60,
+      borderRadius: BorderRadius.circular(8),
+    );
   }
 
   @override
@@ -423,12 +388,6 @@ class _CartScreenState extends State<CartScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _phoneController,
-              decoration: _inputDecoration('Phone Number'),
-              keyboardType: TextInputType.phone,
-            ),
             const SizedBox(height: 24),
 
             // Order Type Selection
@@ -550,6 +509,37 @@ class _CartScreenState extends State<CartScreen> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              
+              // Delivery Instructions
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: TextFormField(
+                  controller: _deliveryInstructionsController,
+                  decoration: InputDecoration(
+                    labelText: 'Delivery Instructions (Optional)',
+                    hintText: 'e.g., "Please deliver between 2-4 PM" or "Call before delivery"',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFFF8C00), width: 2),
+                    ),
+                    prefixIcon: const Icon(Icons.notes, color: Color(0xFFFF8C00)),
+                    filled: true,
+                    fillColor: Colors.transparent,
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                  keyboardType: TextInputType.multiline,
+                ),
               ),
             ],
 
@@ -793,6 +783,13 @@ class _CartScreenState extends State<CartScreen> {
         );
       }
 
+      // Get delivery instructions for delivery orders
+      String? deliveryInstructions;
+      if (_selectedOrderType == OrderType.delivery) {
+        final instructionsText = _deliveryInstructionsController.text.trim();
+        deliveryInstructions = instructionsText.isNotEmpty ? instructionsText : null;
+      }
+
       // Create order with new service method
       final result = await OrderService.createOrder(
         userId: user.uid,
@@ -801,6 +798,7 @@ class _CartScreenState extends State<CartScreen> {
         orderType: _selectedOrderType,
         paymentMethod: _selectedPaymentMethod,
         deliveryAddress: deliveryAddress,
+        deliveryInstructions: deliveryInstructions,
         customerName: _nameController.text.trim().isNotEmpty 
           ? _nameController.text.trim() 
           : 'Customer',
