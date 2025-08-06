@@ -116,9 +116,10 @@ router.post('/', async (req, res) => {
             console.log('🎭 Amount:', totalPrice);
             console.log('🎭 Customer:', customerName, customerEmail);
             
+            let paymentResult;
             try {
                 // Use demo PayPal API for thesis presentation
-                const paymentResult = await createDemoPayPalPayment(orderId, totalPrice, customerName, customerEmail, items);
+                paymentResult = await createDemoPayPalPayment(orderId, totalPrice, customerName, customerEmail, items);
                 
                 console.log('🎭 PayPal payment result:', paymentResult);
             } catch (error) {
