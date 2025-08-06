@@ -42,7 +42,7 @@ class PayPalDemoAPI {
             
             // Create custom PayPal demo checkout URL
             // This will open our realistic PayPal demo page
-            const baseUrl = process.env.BACKEND_URL || process.env.FRONTEND_URL || 'https://ai-pos-backend.onrender.com';
+            const baseUrl = process.env.BACKEND_URL || process.env.FRONTEND_URL || 'https://ai-pos-thesis-2.onrender.com';
             const demoPaymentUrl = `${baseUrl}/api/orders/paypal-demo.html?orderId=${demoOrderId}&amount=₱${amount}&total=₱${amount}`;
             
             console.log('🎭 Demo PayPal URL generated:', demoPaymentUrl);
