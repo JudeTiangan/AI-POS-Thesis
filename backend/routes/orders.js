@@ -938,9 +938,23 @@ router.get('/:orderId', async (req, res) => {
     }
 });
 
+// Test route for debugging
+router.get('/test-paypal', (req, res) => {
+    res.send('PayPal test route working!');
+});
+
 // PayPal Demo Checkout Page
 router.get('/paypal-demo.html', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/paypal-demo.html'));
+    console.log('🎭 PayPal demo page requested');
+    console.log('📁 File path:', path.join(__dirname, '../public/paypal-demo.html'));
+    
+    try {
+        res.sendFile(path.join(__dirname, '../public/paypal-demo.html'));
+        console.log('✅ PayPal demo page served successfully');
+    } catch (error) {
+        console.error('❌ Error serving PayPal demo page:', error);
+        res.status(500).send('Error loading PayPal demo page');
+    }
 });
 
 // Payment redirect routes
