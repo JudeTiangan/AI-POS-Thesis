@@ -1,7 +1,10 @@
 const express = require('express');
+const path = require('path');
 const router = express.Router();
 const { db } = require('../config/firebase');
 const { PayMongoAPI } = require('../config/paymongo');
+const { paypalAPI, getRedirectUrls } = require('../config/paypal');
+const { paypalDemoAPI } = require('../config/paypal-demo');
 
 // Initialize PayMongo
 const payMongo = new PayMongoAPI();
@@ -79,9 +82,10 @@ router.post('/', async (req, res) => {
             console.log('⚠️  Firebase unavailable - using temporary order ID for PayMongo testing');
         }
         
-        // If GCash payment, create PayMongo payment intent
+        // Handle payment processing based on payment method
         let paymentUrl = null;
         let paymentSourceId = null;
+        let paypalOrderId = null;
         
         if (paymentMethod === 'gcash') {
             const paymentResult = await createGCashPayment(orderId, totalPrice, customerName, customerEmail, items);
@@ -106,6 +110,56 @@ router.post('/', async (req, res) => {
                     error: paymentResult.error 
                 });
             }
+        } else if (paymentMethod === 'paypal') {
+            console.log('🎭 Starting PayPal payment creation...');
+            console.log('🎭 Order ID:', orderId);
+            console.log('🎭 Amount:', totalPrice);
+            console.log('🎭 Customer:', customerName, customerEmail);
+            
+            try {
+                // Use demo PayPal API for thesis presentation
+                const paymentResult = await createDemoPayPalPayment(orderId, totalPrice, customerName, customerEmail, items);
+                
+                console.log('🎭 PayPal payment result:', paymentResult);
+            } catch (error) {
+                console.error('❌ PayPal payment creation error:', error);
+                return res.status(500).json({ 
+                    message: 'PayPal payment creation failed', 
+                    error: error.message 
+                });
+            }
+            
+            if (paymentResult.success) {
+                paymentUrl = paymentResult.paymentUrl;
+                paypalOrderId = paymentResult.orderId;
+                paymentSourceId = paypalOrderId; // Set paymentSourceId for PayPal
+                
+                console.log('✅ PayPal payment created successfully');
+                console.log('🔗 PayPal URL:', paymentUrl);
+                console.log('🆔 PayPal Order ID:', paypalOrderId);
+                console.log('🆔 Payment Source ID:', paymentSourceId);
+                
+                // Update order with PayPal order ID (if Firebase available)
+                if (db) {
+                    const orderRef = db.collection('orders').doc(orderId);
+                    await orderRef.update({ 
+                        paypalOrderId: paypalOrderId,
+                        paymentSourceId: paypalOrderId // Use PayPal order ID as payment source ID
+                    });
+                    console.log('✅ Order updated with PayPal details');
+                }
+            } else {
+                console.error('❌ PayPal payment creation failed:', paymentResult.error);
+                // If payment creation fails, delete the order and return error (if Firebase available)
+                if (db) {
+                    const orderRef = db.collection('orders').doc(orderId);
+                    await orderRef.delete();
+                }
+                return res.status(500).json({ 
+                    message: 'Failed to create PayPal payment', 
+                    error: paymentResult.error 
+                });
+            }
         }
         
         // Update customer analytics for AI recommendations (if Firebase available)
@@ -119,9 +173,14 @@ router.post('/', async (req, res) => {
             order: { id: orderId, ...orderData, paymentSourceId }
         };
 
-        // Add payment URL if applicable
+        // Add payment URL and paymentSourceId if applicable
         if (paymentUrl) {
             response.paymentUrl = paymentUrl;
+        }
+        
+        // Add paymentSourceId at the top level for frontend compatibility
+        if (paymentSourceId) {
+            response.paymentSourceId = paymentSourceId;
         }
 
         res.status(201).json(response);
@@ -183,6 +242,84 @@ async function createGCashPayment(orderId, amount, customerName, customerEmail, 
     }
 }
 
+// Demo PayPal Payment Integration for Thesis Presentation
+async function createDemoPayPalPayment(orderId, amount, customerName, customerEmail, items) {
+    try {
+        console.log('🔄 Creating PayPal payment for order:', orderId);
+        console.log('💰 Amount:', amount, 'PHP');
+        console.log('👤 Customer:', customerName, customerEmail);
+        console.log('📦 Items count:', items.length);
+        
+        // Check if paypalDemoAPI is available
+        if (!paypalDemoAPI) {
+            console.error('❌ paypalDemoAPI is not available');
+            throw new Error('PayPal Demo API not initialized');
+        }
+        
+        console.log('✅ paypalDemoAPI is available');
+        
+        // Get redirect URLs
+        const redirectUrls = getRedirectUrls();
+        console.log('🔄 Redirect URLs:', redirectUrls);
+        
+        // Create PayPal order
+        const paymentData = {
+            amount: amount,
+            currency: 'PHP',
+            description: `GENSUGGEST POS Order #${orderId}`,
+            metadata: {
+                orderId: String(orderId),
+                customerName: String(customerName || 'Anonymous'),
+                customerEmail: String(customerEmail || 'no-email'),
+                itemCount: String(items.length)
+            },
+            returnUrl: redirectUrls.success,
+            cancelUrl: redirectUrls.cancel
+        };
+
+        console.log('🎭 Calling paypalDemoAPI.createPayPalOrder with data:', paymentData);
+        
+        let paymentResult;
+        try {
+            paymentResult = await paypalDemoAPI.createPayPalOrder(paymentData);
+            console.log('🎭 PayPal API response:', paymentResult);
+        } catch (apiError) {
+            console.error('❌ PayPal API call failed:', apiError);
+            throw apiError;
+        }
+        
+        if (!paymentResult.success) {
+            console.error('❌ PayPal API returned failure:', paymentResult.error);
+            throw new Error(`PayPal payment creation failed: ${JSON.stringify(paymentResult.error)}`);
+        }
+
+        const paypalOrderId = paymentResult.orderId;
+        const paymentUrl = paymentResult.paymentUrl;
+        
+        console.log('✅ PayPal order created:', paypalOrderId);
+        console.log('🔗 Payment URL generated:', paymentUrl);
+
+        if (!paymentUrl) {
+            console.error('❌ No payment URL returned from PayPal API');
+            throw new Error('No payment URL returned from PayPal');
+        }
+
+        console.log('✅ PayPal payment creation successful');
+        return {
+            success: true,
+            paymentUrl: paymentUrl,
+            orderId: paypalOrderId
+        };
+        
+    } catch (error) {
+        console.error('❌ PayPal payment error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 // POST /api/orders/paymongo/webhook
 // Webhook endpoint for PayMongo payment notifications
 router.post('/paymongo/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -215,6 +352,140 @@ router.post('/paymongo/webhook', express.raw({ type: 'application/json' }), asyn
         res.status(500).json({ message: 'Error processing webhook' });
     }
 });
+
+// POST /api/orders/paypal/webhook
+// Webhook endpoint for PayPal payment notifications
+router.post('/paypal/webhook', express.json(), async (req, res) => {
+    try {
+        const payload = req.body;
+        const signature = req.headers['paypal-transmission-sig'];
+        
+        // Verify webhook signature for security
+        if (!paypalAPI.verifyWebhookSignature(payload, signature)) {
+            console.error('❌ Invalid PayPal webhook signature');
+            return res.status(401).json({ message: 'Invalid webhook signature' });
+        }
+        
+        console.log('📨 PayPal webhook received:', payload.event_type);
+        
+        // Handle PayPal events
+        if (payload.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+            await handlePayPalPaymentSuccess(payload.resource);
+        } else if (payload.event_type === 'PAYMENT.CAPTURE.DENIED') {
+            await handlePayPalPaymentFailure(payload.resource);
+        }
+        
+        res.status(200).json({ message: 'PayPal webhook processed successfully' });
+        
+    } catch (error) {
+        console.error('❌ Error processing PayPal webhook:', error);
+        res.status(500).json({ message: 'Error processing webhook' });
+    }
+});
+
+// POST /api/orders/paypal/capture/:orderId
+// Capture PayPal payment after customer approval
+router.post('/paypal/capture/:orderId', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        
+        console.log('🔄 Capturing PayPal payment for order:', orderId);
+        
+        const captureResult = await paypalAPI.capturePayment(orderId);
+        
+        if (!captureResult.success) {
+            console.error('❌ PayPal capture failed:', captureResult.error);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Failed to capture PayPal payment', 
+                error: captureResult.error 
+            });
+        }
+        
+        console.log('✅ PayPal payment captured successfully:', captureResult.captureId);
+        
+        // Update order payment status (if Firebase available)
+        if (db) {
+            const updateData = {
+                paymentStatus: 'paid',
+                paymentTransactionId: captureResult.captureId,
+                paidAt: new Date()
+            };
+            
+            await db.collection('orders').doc(orderId).update(updateData);
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Payment captured successfully',
+            captureId: captureResult.captureId
+        });
+        
+    } catch (error) {
+        console.error('❌ Error capturing PayPal payment:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error capturing payment', 
+            error: error.message 
+        });
+    }
+});
+
+// Handle PayPal payment success
+async function handlePayPalPaymentSuccess(paymentData) {
+    try {
+        const orderId = paymentData.custom_id || paymentData.invoice_id;
+        const transactionId = paymentData.id;
+        
+        if (!orderId) {
+            console.error('❌ No order ID in PayPal payment data');
+            return;
+        }
+
+        // Update order payment status (if Firebase available)
+        if (db) {
+            const updateData = {
+                paymentStatus: 'paid',
+                paymentTransactionId: transactionId,
+                paidAt: new Date()
+            };
+            
+            await db.collection('orders').doc(orderId).update(updateData);
+        }
+        
+        console.log(`✅ Order ${orderId} PayPal payment successful - Transaction: ${transactionId}`);
+        
+    } catch (error) {
+        console.error('❌ Error handling PayPal payment success:', error);
+    }
+}
+
+// Handle PayPal payment failure
+async function handlePayPalPaymentFailure(paymentData) {
+    try {
+        const orderId = paymentData.custom_id || paymentData.invoice_id;
+        
+        if (!orderId) {
+            console.error('❌ No order ID in PayPal payment data');
+            return;
+        }
+
+        // Update order payment status (if Firebase available)
+        if (db) {
+            const updateData = {
+                paymentStatus: 'failed',
+                failedAt: new Date()
+            };
+            
+            await db.collection('orders').doc(orderId).update(updateData);
+        }
+        
+        console.log(`❌ Order ${orderId} PayPal payment failed`);
+        
+    } catch (error) {
+        console.error('❌ Error handling PayPal payment failure:', error);
+    }
+}
 
 // Handle successful payment
 async function handlePaymentSuccess(paymentData) {
@@ -666,31 +937,108 @@ router.get('/:orderId', async (req, res) => {
     }
 });
 
+// PayPal Demo Checkout Page
+router.get('/paypal-demo.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/paypal-demo.html'));
+});
+
 // Payment redirect routes
 router.get('/payment-success', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Payment Successful</title>
+            <title>Payment Successful - PayPal</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f0f8ff; }
-                .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
-                .message { font-size: 18px; margin-bottom: 30px; }
-                .close-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+                body { 
+                    font-family: 'Helvetica Neue', Arial, sans-serif; 
+                    text-align: center; 
+                    padding: 50px; 
+                    background: #f7f9fa;
+                    margin: 0;
+                }
+                .success-container {
+                    max-width: 500px;
+                    margin: 0 auto;
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    padding: 40px;
+                }
+                .success-icon { 
+                    color: #28a745; 
+                    font-size: 48px; 
+                    margin-bottom: 20px; 
+                }
+                .success-title { 
+                    color: #28a745; 
+                    font-size: 24px; 
+                    margin-bottom: 20px; 
+                    font-weight: bold;
+                }
+                .message { 
+                    font-size: 16px; 
+                    margin-bottom: 20px; 
+                    color: #6b7c93;
+                }
+                .order-details {
+                    background: #f7f9fa;
+                    padding: 20px;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                    text-align: left;
+                }
+                .order-detail {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 10px;
+                    font-size: 14px;
+                }
+                .close-btn { 
+                    background: #0070ba; 
+                    color: white; 
+                    padding: 12px 24px; 
+                    border: none; 
+                    border-radius: 4px; 
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                .close-btn:hover {
+                    background: #005ea6;
+                }
             </style>
         </head>
         <body>
-            <div class="success">✅ Payment Successful!</div>
-            <div class="message">Your GCash payment has been processed successfully.</div>
-            <div class="message">You can now close this window and return to the app.</div>
-            <button class="close-btn" onclick="window.close()">Close Window</button>
+            <div class="success-container">
+                <div class="success-icon">✅</div>
+                <div class="success-title">Payment Successful!</div>
+                <div class="message">Your PayPal payment has been processed successfully.</div>
+                
+                <div class="order-details">
+                    <div class="order-detail">
+                        <span>Order ID:</span>
+                        <span>${req.query.orderId || 'DEMO-ORDER'}</span>
+                    </div>
+                    <div class="order-detail">
+                        <span>Amount:</span>
+                        <span>${req.query.amount || '₱157.50'}</span>
+                    </div>
+                    <div class="order-detail">
+                        <span>Status:</span>
+                        <span style="color: #28a745; font-weight: bold;">Paid</span>
+                    </div>
+                </div>
+                
+                <div class="message">You can now close this window and return to the app.</div>
+                <button class="close-btn" onclick="window.close()">Close Window</button>
+            </div>
             <script>
-                // Auto-close after 5 seconds
+                // Auto-close after 8 seconds
                 setTimeout(() => {
                     window.close();
-                }, 5000);
+                }, 8000);
             </script>
         </body>
         </html>
