@@ -13,6 +13,10 @@ class ApiConfig {
       return _productionBaseUrl;
     }
     
+    // TEMPORARY: Force production backend for testing
+    // TODO: Change back to localhost for local development
+    return _productionBaseUrl;
+    
     // Development mode - can switch between local and hosted
     // Set USE_HOSTED_BACKEND=true to test with hosted backend locally
     const bool useHostedInDev = bool.fromEnvironment('USE_HOSTED_BACKEND', defaultValue: false);

@@ -81,6 +81,7 @@ class OrderService {
             'success': true,
             'order': order,
             'paymentUrl': responseData['paymentUrl'], // For GCash payments
+            'paymentSourceId': responseData['paymentSourceId'], // For PayPal payments
           };
         } catch (e) {
           print('❌ Error parsing order response: $e');

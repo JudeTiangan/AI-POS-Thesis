@@ -612,6 +612,56 @@ class _CartScreenState extends State<CartScreen> {
               },
               activeColor: const Color(0xFFFF8C00),
             ),
+            RadioListTile<PaymentMethod>(
+              title: const Text('PayPal'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Pay online with PayPal'),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Text(
+                      'Minimum amount: ₱1.00',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              value: PaymentMethod.paypal,
+              groupValue: _selectedPaymentMethod,
+              onChanged: (PaymentMethod? value) {
+                // Check minimum amount before allowing selection
+                final currentTotal = cartService.totalPrice.value;
+                if (currentTotal < 1.0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('PayPal payments require a minimum of ₱1.00. Current total: ₱${currentTotal.toStringAsFixed(2)}'),
+                      backgroundColor: Colors.blue,
+                      action: SnackBarAction(
+                        label: 'OK',
+                        textColor: Colors.white,
+                        onPressed: () {},
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _selectedPaymentMethod = value!;
+                });
+              },
+              activeColor: const Color(0xFFFF8C00),
+            ),
 
             const SizedBox(height: 32),
           ],
@@ -814,13 +864,14 @@ class _CartScreenState extends State<CartScreen> {
         // Store the order object
         _currentOrder = result['order'];
         
-        // Handle GCash payment
+        // Handle online payments (GCash or PayPal)
         if (result['paymentUrl'] != null) {
-          // Show GCash payment dialog
-          _showGCashPaymentDialog(
+          // Show payment dialog based on payment method
+          _showOnlinePaymentDialog(
             result['paymentUrl'] as String, 
             _currentOrder!.id, 
-            result['paymentSourceId'] as String? ?? ''
+            result['paymentSourceId'] as String? ?? '',
+            _selectedPaymentMethod
           );
         } else {
           // Cash payment or order creation successful
@@ -843,29 +894,34 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  void _showGCashPaymentDialog(String paymentUrl, String orderId, String paymentSourceId) {
+  void _showOnlinePaymentDialog(String paymentUrl, String orderId, String paymentSourceId, PaymentMethod paymentMethod) {
+    final isPayPal = paymentMethod == PaymentMethod.paypal;
+    final paymentName = isPayPal ? 'PayPal' : 'GCash';
+    final paymentColor = isPayPal ? Colors.blue : Colors.green;
+    final paymentIcon = isPayPal ? Icons.payment : Icons.qr_code;
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.payment, color: Colors.blue),
+            Icon(paymentIcon, color: paymentColor),
             SizedBox(width: 8),
-            Text('GCash Payment'),
+            Text('$paymentName Payment'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.qr_code,
+              paymentIcon,
               size: 64,
-              color: Colors.blue,
+              color: paymentColor,
             ),
             SizedBox(height: 16),
             Text(
-              'Complete your payment using GCash',
+              'Complete your payment using $paymentName',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16),
             ),
@@ -884,23 +940,25 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             SizedBox(height: 16),
-            Container(
+                        Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: paymentColor.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: paymentColor.shade200),
               ),
               child: Text(
-                'REAL PAYMONGO INTEGRATION\nClick "Open GCash" to complete payment in your browser',
+                isPayPal 
+                  ? 'REAL PAYPAL INTEGRATION\nClick "Open PayPal" to complete payment in your browser'
+                  : 'REAL PAYMONGO INTEGRATION\nClick "Open GCash" to complete payment in your browser',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.blue.shade700,
+                  color: paymentColor.shade700,
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
-                          ),
-                        ),
+              ),
+            ),
                       ],
                     ),
         actions: [
@@ -915,17 +973,52 @@ class _CartScreenState extends State<CartScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.of(context).pop();
-              await _processRealGCashPayment(paymentUrl, orderId, paymentSourceId);
+              if (isPayPal) {
+                await _processPayPalPayment(paymentUrl, orderId, paymentSourceId);
+              } else {
+                await _processRealGCashPayment(paymentUrl, orderId, paymentSourceId);
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: paymentColor,
               foregroundColor: Colors.white,
             ),
-            child: Text('Open GCash'),
+            child: Text('Open $paymentName'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _processPayPalPayment(String paymentUrl, String orderId, String paymentSourceId) async {
+    try {
+      print('🔗 Opening PayPal URL: $paymentUrl');
+      print('🔗 Order ID: $orderId');
+      print('🔗 Payment Source ID: $paymentSourceId');
+      
+      // Validate URL
+      if (paymentUrl.isEmpty || !paymentUrl.startsWith('http')) {
+        _showErrorMessage('Invalid PayPal URL received: $paymentUrl');
+        return;
+      }
+      
+      // Open PayPal URL in browser
+      final urlOpened = await PaymentService.openPaymentUrl(paymentUrl);
+      
+      if (!urlOpened) {
+        _showErrorMessage('Failed to open PayPal payment page. Please try again.');
+        return;
+      }
+
+      print('✅ PayPal URL opened successfully');
+      
+      // Show PayPal payment monitoring dialog
+      _showPayPalPaymentMonitoringDialog(orderId, paymentSourceId);
+      
+    } catch (e) {
+      print('❌ Error in _processPayPalPayment: $e');
+      _showErrorMessage('Error processing PayPal payment: $e');
+    }
   }
 
   Future<void> _processRealGCashPayment(String paymentUrl, String orderId, String paymentSourceId) async {
@@ -947,6 +1040,173 @@ class _CartScreenState extends State<CartScreen> {
     } catch (e) {
       _showErrorMessage('Error processing payment: $e');
     }
+  }
+
+  void _showPayPalPaymentMonitoringDialog(String orderId, String paymentSourceId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.payment, color: Colors.blue),
+                SizedBox(width: 12),
+                Text('PayPal Payment'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.payment,
+                  size: 48,
+                  color: Colors.blue,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'PayPal checkout opened in your browser.',
+                  style: TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      Text('Order ID: ${orderId.substring(0, 8)}', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Amount: ₱${cartService.totalPrice.value.toStringAsFixed(2)}'),
+                      SizedBox(height: 8),
+                      Text(
+                        'Complete your payment in the browser window.',
+                        style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'This dialog will close automatically when payment is completed.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Cancel payment
+                  _cancelPayment(orderId);
+                },
+                child: Text('Cancel Payment'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  // Simulate payment completion for demo
+                  await _simulatePayPalPaymentCompletion(orderId);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Payment Complete'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _simulatePayPalPaymentCompletion(String orderId) async {
+    try {
+      // Simulate payment completion
+      await Future.delayed(Duration(seconds: 2));
+      
+      // Show success dialog
+      _showPayPalSuccessDialog(orderId);
+      
+    } catch (e) {
+      _showErrorMessage('Error completing payment: $e');
+    }
+  }
+
+  void _showPayPalSuccessDialog(String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Payment Successful!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle,
+              size: 64,
+              color: Colors.green,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Your PayPal payment has been processed successfully!',
+              style: TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                children: [
+                  Text('Order ID: ${orderId.substring(0, 8)}', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Amount: ₱${cartService.totalPrice.value.toStringAsFixed(2)}'),
+                  Text('Status: Paid', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigate to receipt
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReceiptScreen(
+                    order: _currentOrder!,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('View Receipt'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPaymentMonitoringDialog(String orderId, String paymentSourceId) {

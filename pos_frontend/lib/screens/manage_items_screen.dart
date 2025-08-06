@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/models/item.dart';
-import 'package:frontend/models/category.dart';
+import 'package:frontend/models/category.dart' as models;
 import 'package:frontend/services/item_service.dart';
 import 'package:frontend/services/category_service.dart';
 import 'package:frontend/widgets/product_image_widget.dart';
@@ -19,7 +20,7 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
   final CategoryService _categoryService = CategoryService();
   
   late Future<List<Item>> _itemsFuture;
-  late Future<List<Category>> _categoriesFuture;
+  late Future<List<models.Category>> _categoriesFuture;
 
   @override
   void initState() {
@@ -29,12 +30,24 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
 
   void _loadData() {
     setState(() {
+      _futureBuilderKey = UniqueKey(); // Force rebuild
       _itemsFuture = _itemService.getItems();
       _categoriesFuture = _categoryService.getCategories();
     });
   }
 
+  // Add a key to force FutureBuilder rebuild
+  Key _futureBuilderKey = UniqueKey();
+
   Widget _buildItemImage(String? imageUrl) {
+    // 🔍 DEBUG: Log image URL for troubleshooting
+    print('🖼️ _buildItemImage called for: ${imageUrl ?? "NULL"}');
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      print('   ✅ Has image URL: ${imageUrl.substring(0, 50)}...');
+    } else {
+      print('   ❌ No image URL provided');
+    }
+    
     return ProductThumbnail(
       imageUrl: imageUrl,
       size: 50,
@@ -46,6 +59,7 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Manage Items')),
       body: FutureBuilder<List<Item>>(
+        key: _futureBuilderKey,
         future: _itemsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -160,7 +174,7 @@ class _ManageItemsScreenState extends State<ManageItemsScreen> {
 // A separate StatefulWidget for the Dialog to manage its own complex state
 class _ItemDialog extends StatefulWidget {
   final Item? item;
-  final List<Category> categories;
+  final List<models.Category> categories;
   final ItemService itemService;
   final VoidCallback onSave;
 
@@ -175,11 +189,10 @@ class __ItemDialogState extends State<_ItemDialog> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   late TextEditingController _priceController;
-  late TextEditingController _barcodeController;
   late TextEditingController _quantityController;
-  
   String? _selectedCategoryId;
   File? _imageFile;
+  XFile? _webImageFile; // For web compatibility
 
   @override
   void initState() {
@@ -187,27 +200,60 @@ class __ItemDialogState extends State<_ItemDialog> {
     _nameController = TextEditingController(text: widget.item?.name ?? '');
     _descriptionController = TextEditingController(text: widget.item?.description ?? '');
     _priceController = TextEditingController(text: widget.item?.price.toString() ?? '');
-    _barcodeController = TextEditingController(text: widget.item?.barcode ?? '');
-    _quantityController = TextEditingController(text: widget.item?.quantity.toString() ?? '0');
+    _quantityController = TextEditingController(text: widget.item?.quantity.toString() ?? '');
     _selectedCategoryId = widget.item?.categoryId;
-
-    // Ensure the selected category ID is valid
-    if (_selectedCategoryId != null && !widget.categories.any((c) => c.id == _selectedCategoryId)) {
-        _selectedCategoryId = null;
-    }
-    // Set a default category if none is selected
-    if (_selectedCategoryId == null && widget.categories.isNotEmpty) {
-        _selectedCategoryId = widget.categories.first.id;
-    }
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
     if (pickedFile != null) {
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _webImageFile = pickedFile; // Store XFile for web compatibility
+        if (!kIsWeb) {
+          _imageFile = File(pickedFile.path); // Only create File on non-web platforms
+        }
       });
     }
+  }
+
+  // Web-compatible image widget
+  Widget _buildSelectedImageWidget() {
+    if (_webImageFile == null && _imageFile == null) {
+      // Show existing image or placeholder
+      return widget.item?.imageUrl != null && widget.item!.imageUrl!.isNotEmpty
+          ? _buildDialogImage(widget.item!.imageUrl!)
+          : Container(height: 100, color: Colors.grey[200], child: const Icon(Icons.image));
+    }
+
+    // Show selected image - web compatible
+    if (kIsWeb && _webImageFile != null) {
+      return FutureBuilder<Uint8List>(
+        future: _webImageFile!.readAsBytes(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return Image.memory(
+              snapshot.data!,
+              height: 100,
+              width: 100,
+              fit: BoxFit.cover,
+            );
+          }
+          return Container(
+            height: 100,
+            width: 100,
+            color: Colors.grey[200],
+            child: const CircularProgressIndicator(),
+          );
+        },
+      );
+    } else if (_imageFile != null) {
+      // Mobile/Desktop - use File
+      return Image.file(_imageFile!, height: 100);
+    }
+    
+    return Container(height: 100, color: Colors.grey[200], child: const Icon(Icons.image));
   }
 
   @override
@@ -221,11 +267,7 @@ class __ItemDialogState extends State<_ItemDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _imageFile == null
-                  ? (widget.item?.imageUrl != null && widget.item!.imageUrl!.isNotEmpty
-                      ? _buildDialogImage(widget.item!.imageUrl!)
-                      : Container(height: 100, color: Colors.grey[200], child: const Icon(Icons.image)))
-                  : Image.file(_imageFile!, height: 100),
+              _buildSelectedImageWidget(),
               TextButton.icon(
                 icon: const Icon(Icons.image),
                 label: const Text('Select Image'),
@@ -247,19 +289,15 @@ class __ItemDialogState extends State<_ItemDialog> {
                 validator: (value) => value!.isEmpty || double.tryParse(value) == null ? 'Please enter a valid price' : null,
               ),
                TextFormField(
-                controller: _barcodeController,
-                decoration: const InputDecoration(labelText: 'Barcode (optional)'),
-              ),
-              TextFormField(
-                controller: _quantityController,
-                decoration: const InputDecoration(labelText: 'Quantity'),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty || int.tryParse(value) == null ? 'Please enter a valid quantity' : null,
+                                 controller: _quantityController,
+                 decoration: const InputDecoration(labelText: 'Quantity'),
+                 keyboardType: TextInputType.number,
+                 validator: (value) => value!.isEmpty || int.tryParse(value) == null ? 'Please enter a valid quantity' : null,
               ),
               DropdownButtonFormField<String>(
                 value: _selectedCategoryId,
                 decoration: const InputDecoration(labelText: 'Category'),
-                items: widget.categories.map((Category category) {
+                items: widget.categories.map((models.Category category) {
                   return DropdownMenuItem<String>(
                     value: category.id,
                     child: Text(category.name),
@@ -282,29 +320,49 @@ class __ItemDialogState extends State<_ItemDialog> {
           child: const Text('Save'),
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              final quantityValue = int.tryParse(_quantityController.text) ?? 0;
-              print('DEBUG: Saving item with quantity: $quantityValue');
-              print('DEBUG: Quantity controller text: ${_quantityController.text}');
+              final isEditing = widget.item != null;
               
-              final item = Item(
-                id: widget.item?.id,
-                name: _nameController.text,
-                description: _descriptionController.text,
-                price: double.parse(_priceController.text),
-                categoryId: _selectedCategoryId!,
-                barcode: _barcodeController.text,
-                quantity: quantityValue,
-              );
-
-              print('DEBUG: Item object created with quantity: ${item.quantity}');
+                              final item = Item(
+                  id: widget.item?.id,
+                  name: _nameController.text,
+                  description: _descriptionController.text,
+                  price: double.parse(_priceController.text),
+                  quantity: int.parse(_quantityController.text),
+                  categoryId: _selectedCategoryId!,
+                  imageUrl: widget.item?.imageUrl,
+                );
 
               try {
                 if (isEditing) {
                   print('DEBUG: Updating existing item...');
-                  await widget.itemService.updateItem(id: item.id!, item: item, imageFile: _imageFile);
+                  // Pass the appropriate file based on platform
+                  if (kIsWeb && _webImageFile != null) {
+                    await widget.itemService.updateItem(
+                      id: item.id!, 
+                      item: item, 
+                      webImageFile: _webImageFile
+                    );
+                  } else {
+                    await widget.itemService.updateItem(
+                      id: item.id!, 
+                      item: item, 
+                      imageFile: _imageFile
+                    );
+                  }
                 } else {
                   print('DEBUG: Adding new item...');
-                  await widget.itemService.addItem(item: item, imageFile: _imageFile);
+                  // Pass the appropriate file based on platform
+                  if (kIsWeb && _webImageFile != null) {
+                    await widget.itemService.addItem(
+                      item: item, 
+                      webImageFile: _webImageFile
+                    );
+                  } else {
+                    await widget.itemService.addItem(
+                      item: item, 
+                      imageFile: _imageFile
+                    );
+                  }
                 }
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(

@@ -544,6 +544,8 @@ class ReceiptScreen extends StatelessWidget {
         return order.orderType == OrderType.pickup ? 'Cash on Pickup' : 'Cash on Delivery';
       case PaymentMethod.gcash:
         return 'GCash';
+      case PaymentMethod.paypal:
+        return 'PayPal';
     }
   }
 

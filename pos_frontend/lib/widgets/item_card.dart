@@ -42,12 +42,11 @@ class ItemCard extends StatelessWidget {
               color: Colors.orange,
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
-                'LOW STOCK (${item.quantity})',
+                'LOW STOCK ( {item.quantity})',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
               ),
             ),
-          
           // Large image section (most of the card)
           Expanded(
             flex: 5, // Give image most of the space
@@ -57,77 +56,73 @@ class ItemCard extends StatelessWidget {
               child: _buildItemImage(),
             ),
           ),
-          
-          // Very compact text content section
-          Expanded(
-            flex: 1, // Minimal space for text, just enough for essentials
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Product name (single line)
-                  Text(
-                    item.name,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  
-                  // Price and stock in one line
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '₱${item.price.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
-                      ),
-                      if (item.isInStock)
-                        Text(
-                          '${item.quantity}',
-                          style: const TextStyle(fontSize: 8, color: Colors.grey),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  
-                  // Very compact add button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 20,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        try {
-                          cartService.addItem(item, quantity: 1);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${item.name} added to cart'),
-                              duration: const Duration(seconds: 1),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to add ${item.name}: $e'),
-                              duration: const Duration(seconds: 2),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                        textStyle: const TextStyle(fontSize: 9),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text('Add'),
+          // Text and Add button section (fixed height)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Product name (single line)
+                Text(
+                  item.name,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                // Price and stock in one line
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '₱${item.price.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
                     ),
-                  ),
-                ],
-              ),
+                    if (item.isInStock)
+                      Text(
+                        '${item.quantity}',
+                        style: const TextStyle(fontSize: 8, color: Colors.grey),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                // Add button (always visible if in stock)
+                SizedBox(
+                  width: double.infinity,
+                  height: 28, // Increased height for easier tapping on mobile
+                  child: item.isInStock
+                      ? ElevatedButton(
+                          onPressed: () {
+                            try {
+                              cartService.addItem(item, quantity: 1);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${item.name} added to cart'),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to add ${item.name}: $e'),
+                                  duration: const Duration(seconds: 2),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                            textStyle: const TextStyle(fontSize: 11),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text('Add'),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
           ),
         ],

@@ -8,14 +8,28 @@ class PaymentService {
   /// Minimum amount for GCash payments (PayMongo requirement)
   static const double minimumGCashAmount = 20.0;
   
-  /// Validate minimum amount for GCash payments
+  /// Minimum amount for PayPal payments
+  static const double minimumPayPalAmount = 1.0;
+  
+  /// Validate minimum amount for payments
   static Map<String, dynamic> validatePaymentAmount(double amount, String paymentMethod) {
-    if (paymentMethod.toLowerCase() == 'gcash' && amount < minimumGCashAmount) {
+    final method = paymentMethod.toLowerCase();
+    
+    if (method == 'gcash' && amount < minimumGCashAmount) {
       return {
         'isValid': false,
         'error': 'Minimum amount for GCash payments is ₱${minimumGCashAmount.toStringAsFixed(2)}',
         'currentAmount': amount,
         'minimumAmount': minimumGCashAmount,
+      };
+    }
+    
+    if (method == 'paypal' && amount < minimumPayPalAmount) {
+      return {
+        'isValid': false,
+        'error': 'Minimum amount for PayPal payments is ₱${minimumPayPalAmount.toStringAsFixed(2)}',
+        'currentAmount': amount,
+        'minimumAmount': minimumPayPalAmount,
       };
     }
     
@@ -28,19 +42,26 @@ class PaymentService {
   /// Open payment URL in external browser or in-app browser
   static Future<bool> openPaymentUrl(String paymentUrl) async {
     try {
+      print('🔗 PaymentService: Attempting to open URL: $paymentUrl');
+      
       final Uri uri = Uri.parse(paymentUrl);
+      print('🔗 PaymentService: Parsed URI: $uri');
       
       // Use external browser for better payment security
       if (await canLaunchUrl(uri)) {
-        return await launchUrl(
+        print('🔗 PaymentService: URL can be launched');
+        final result = await launchUrl(
           uri,
           mode: LaunchMode.externalApplication, // Opens in external browser
         );
+        print('🔗 PaymentService: Launch result: $result');
+        return result;
       } else {
+        print('❌ PaymentService: URL cannot be launched');
         throw Exception('Could not launch payment URL');
       }
     } catch (e) {
-      print('Error opening payment URL: $e');
+      print('❌ PaymentService: Error opening payment URL: $e');
       return false;
     }
   }

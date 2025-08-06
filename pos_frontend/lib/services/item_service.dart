@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart'; // For kIsWeb
+import 'package:image_picker/image_picker.dart'; // For XFile
 import 'package:frontend/models/item.dart';
 import 'package:frontend/services/api_config.dart';
 import 'package:frontend/services/firebase_storage_service.dart';
@@ -14,6 +16,35 @@ class ItemService {
       if (response.statusCode == 200) {
         List<dynamic> body = jsonDecode(response.body);
         List<Item> items = body.map((dynamic item) => Item.fromJson(item)).toList();
+        
+        // 🔍 ENHANCED DEBUG: Log image URLs for troubleshooting
+        print('');
+        print('🖼️ === IMAGE URL DEBUG REPORT ===');
+        print('📡 Backend URL: $_baseUrl');
+        print('📦 Total items received: ${items.length}');
+        print('');
+        
+        for (int i = 0; i < items.length; i++) {
+          final item = items[i];
+          print('📋 Item ${i + 1}: ${item.name}');
+          if (item.imageUrl != null && item.imageUrl!.isNotEmpty) {
+            print('   ✅ Has image: ${item.imageUrl}');
+            print('   🔗 URL length: ${item.imageUrl!.length}');
+            print('   🌐 Is HTTP: ${item.imageUrl!.startsWith('http')}');
+            print('   🔥 Is Firebase: ${item.imageUrl!.contains('firebasestorage.googleapis.com')}');
+            
+            // Test if URL is directly accessible (for debugging)
+            if (item.imageUrl!.startsWith('https://firebasestorage.googleapis.com')) {
+              print('   📡 Firebase Storage URL detected - should work with Image.network');
+            }
+          } else {
+            print('   ❌ No image URL (null or empty)');
+          }
+          print('');
+        }
+        print('🖼️ === END DEBUG REPORT ===');
+        print('');
+        
         return items;
       } else {
         throw "Failed to load items";
@@ -25,7 +56,7 @@ class ItemService {
   }
 
   // Handles creating a new item, with an optional image file
-  Future<Item> addItem({required Item item, File? imageFile}) async {
+  Future<Item> addItem({required Item item, File? imageFile, XFile? webImageFile}) async {
     try {
       print('🔄 Adding item with Firebase Storage: ${imageFile != null ? imageFile.path : 'no image'}');
       
@@ -39,7 +70,6 @@ class ItemService {
           'price': item.price,
           'categoryId': item.categoryId,
           'quantity': item.quantity,
-          'barcode': item.barcode,
           'imageUrl': null, // Will be updated after image upload
         }),
       );
@@ -54,12 +84,23 @@ class ItemService {
       print('✅ Item created with ID: ${createdItem.id}');
 
       // If there's an image, upload it to Firebase Storage
-      if (imageFile != null && createdItem.id != null) {
+      if ((imageFile != null || webImageFile != null) && createdItem.id != null) {
         print('🖼️ Uploading image to Firebase Storage...');
-        final imageUrl = await FirebaseStorageService.uploadProductImage(
-          itemId: createdItem.id!,
-          imageFile: imageFile,
-        );
+        String? imageUrl;
+        
+        if (kIsWeb && webImageFile != null) {
+          // Web platform - use XFile
+          imageUrl = await FirebaseStorageService.uploadProductImageFromXFile(
+            itemId: createdItem.id!,
+            imageFile: webImageFile,
+          );
+        } else if (imageFile != null) {
+          // Mobile/Desktop platform - use File
+          imageUrl = await FirebaseStorageService.uploadProductImage(
+            itemId: createdItem.id!,
+            imageFile: imageFile,
+          );
+        }
 
         if (imageUrl != null) {
           print('✅ Image uploaded, updating item with URL: $imageUrl');
@@ -73,7 +114,6 @@ class ItemService {
               price: createdItem.price,
               categoryId: createdItem.categoryId,
               quantity: createdItem.quantity,
-              barcode: createdItem.barcode,
               imageUrl: imageUrl,
             ),
           );
@@ -86,7 +126,6 @@ class ItemService {
             price: createdItem.price,
             categoryId: createdItem.categoryId,
             quantity: createdItem.quantity,
-            barcode: createdItem.barcode,
             imageUrl: imageUrl,
           );
         } else {
@@ -102,27 +141,32 @@ class ItemService {
   }
 
   // Handles updating an item, with an optional new image
-  Future<void> updateItem({required String id, required Item item, File? imageFile}) async {
+  Future<void> updateItem({required String id, required Item item, File? imageFile, XFile? webImageFile}) async {
     try {
       print('🔄 Updating item $id with Firebase Storage');
       
       String? imageUrl = item.imageUrl; // Keep existing image URL if no new image
       
       // If there's a new image, upload it to Firebase Storage
-      if (imageFile != null) {
+      if (imageFile != null || webImageFile != null) {
         print('🖼️ Uploading new image to Firebase Storage...');
-        imageUrl = await FirebaseStorageService.uploadProductImage(
-          itemId: id,
-          imageFile: imageFile,
-        );
         
-        if (imageUrl != null) {
-          print('✅ Image uploaded successfully: $imageUrl');
-        } else {
-          print('⚠️ Image upload failed, keeping existing image');
-          imageUrl = item.imageUrl; // Keep existing image if upload fails
+        if (kIsWeb && webImageFile != null) {
+          // Web platform - use XFile
+          imageUrl = await FirebaseStorageService.uploadProductImageFromXFile(
+            itemId: id,
+            imageFile: webImageFile,
+          );
+        } else if (imageFile != null) {
+          // Mobile/Desktop platform - use File
+          imageUrl = await FirebaseStorageService.uploadProductImage(
+            itemId: id,
+            imageFile: imageFile,
+          );
         }
-      }
+        
+        print('✅ Image uploaded successfully: $imageUrl');
+            }
 
       // Update the item with JSON body
       final response = await http.put(
@@ -134,7 +178,6 @@ class ItemService {
           'price': item.price,
           'categoryId': item.categoryId,
           'quantity': item.quantity,
-          'barcode': item.barcode,
           'imageUrl': imageUrl,
         }),
       );

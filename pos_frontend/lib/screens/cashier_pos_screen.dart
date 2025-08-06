@@ -409,6 +409,18 @@ class _CashierPOSScreenState extends State<CashierPOSScreen> {
                                     },
                                   ),
                                 ),
+                                Expanded(
+                                  child: RadioListTile<PaymentMethod>(
+                                    title: const Text('PayPal'),
+                                    value: PaymentMethod.paypal,
+                                    groupValue: _selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedPaymentMethod = value!;
+                                      });
+                                    },
+                                  ),
+                                ),
                               ],
                             ),
                           ],

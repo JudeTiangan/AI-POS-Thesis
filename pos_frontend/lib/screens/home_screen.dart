@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+
 import 'package:frontend/models/item.dart';
 import 'package:frontend/models/cart_item.dart';
 import 'package:frontend/models/category.dart';
@@ -76,16 +76,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadData() async {
     try {
+      print('🔄 Loading data in HomeScreen...');
       final items = await _itemService.getItems();
       final categories = await _categoryService.getCategories();
+      
+      print('📦 Loaded ${items.length} items');
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        print('   📋 Item ${i + 1}: ${item.name}');
+        print('      Image URL: ${item.imageUrl ?? "NULL"}');
+        if (item.imageUrl != null && item.imageUrl!.isNotEmpty) {
+          print('      ✅ Has image URL (${item.imageUrl!.length} chars)');
+        } else {
+          print('      ❌ No image URL');
+        }
+      }
       
       setState(() {
         _allItems = items;
         _categories = categories;
         _applyFilters(); // Apply current filters to new data
       });
+      
+      print('✅ Data loaded and state updated');
     } catch (e) {
-      print('Error loading data: $e');
+      print('❌ Error loading data: $e');
     }
   }
 
@@ -428,28 +443,54 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    try {
-      String barcodeScanRes = await FlutterBarcodeScanner.scanBarcode(
-          '#ff6666', 'Cancel', true, ScanMode.BARCODE);
-
-      if (barcodeScanRes != '-1') {
-        final Item? item = await _itemService.getItemByBarcode(barcodeScanRes);
-        if (item != null) {
-          _cartService.addItem(item);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${item.name} added to cart!')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Item not found for this barcode.')),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to scan barcode: $e')),
-      );
-    }
+    // Show dialog for manual barcode entry (camera scanning disabled for APK build)
+    showDialog(
+      context: context,
+      builder: (context) {
+        String barcodeInput = '';
+        return AlertDialog(
+          title: const Text('Enter Barcode'),
+          content: TextField(
+            onChanged: (value) => barcodeInput = value,
+            decoration: const InputDecoration(
+              hintText: 'Enter barcode manually',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                if (barcodeInput.isNotEmpty) {
+                  try {
+                    final Item? item = await _itemService.getItemByBarcode(barcodeInput);
+                    if (item != null) {
+                      _cartService.addItem(item);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${item.name} added to cart!')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Item not found for this barcode.')),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildCategorySection() {
@@ -693,4 +734,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-} 
+}
+
+ 

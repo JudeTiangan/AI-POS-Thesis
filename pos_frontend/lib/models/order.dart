@@ -1,8 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+  import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum OrderType { pickup, delivery }
 enum OrderStatus { pending, preparing, ready, completed, cancelled }
-enum PaymentMethod { cash, gcash }
+enum PaymentMethod { cash, gcash, paypal }
 enum PaymentStatus { pending, paid, failed, refunded }
 
 class DeliveryAddress {
