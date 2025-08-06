@@ -35,6 +35,10 @@ class _CartScreenState extends State<CartScreen> {
   final _landmarksController = TextEditingController();
   final _deliveryInstructionsController = TextEditingController();
   
+  // Saved address data
+  Map<String, String>? _savedAddress1;
+  Map<String, String>? _savedAddress2;
+  
   OrderType _selectedOrderType = OrderType.pickup;
   PaymentMethod _selectedPaymentMethod = PaymentMethod.cash;
   bool _isProcessingOrder = false;
@@ -77,6 +81,96 @@ class _CartScreenState extends State<CartScreen> {
       size: 60,
       borderRadius: BorderRadius.circular(8),
     );
+  }
+  
+  // Save current address to Address 1
+  void _saveToAddress1() {
+    final address = {
+      'street': _streetController.text,
+      'city': _cityController.text,
+      'province': _provinceController.text,
+      'postalCode': _postalCodeController.text,
+      'landmarks': _landmarksController.text,
+    };
+    
+    _savedAddress1 = address;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Address saved to Address 1!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+  
+  // Save current address to Address 2
+  void _saveToAddress2() {
+    final address = {
+      'street': _streetController.text,
+      'city': _cityController.text,
+      'province': _provinceController.text,
+      'postalCode': _postalCodeController.text,
+      'landmarks': _landmarksController.text,
+    };
+    
+    _savedAddress2 = address;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Address saved to Address 2!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+  
+  // Load saved address from Address 1
+  void _loadFromAddress1() {
+    if (_savedAddress1 != null) {
+      _streetController.text = _savedAddress1!['street'] ?? '';
+      _cityController.text = _savedAddress1!['city'] ?? '';
+      _provinceController.text = _savedAddress1!['province'] ?? '';
+      _postalCodeController.text = _savedAddress1!['postalCode'] ?? '';
+      _landmarksController.text = _savedAddress1!['landmarks'] ?? '';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address 1 loaded successfully!'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No saved address in Address 1'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+  
+  // Load saved address from Address 2
+  void _loadFromAddress2() {
+    if (_savedAddress2 != null) {
+      _streetController.text = _savedAddress2!['street'] ?? '';
+      _cityController.text = _savedAddress2!['city'] ?? '';
+      _provinceController.text = _savedAddress2!['province'] ?? '';
+      _postalCodeController.text = _savedAddress2!['postalCode'] ?? '';
+      _landmarksController.text = _savedAddress2!['landmarks'] ?? '';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address 2 loaded successfully!'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No saved address in Address 2'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   @override
@@ -431,11 +525,250 @@ class _CartScreenState extends State<CartScreen> {
               const SizedBox(height: 24),
               _buildSectionTitle('Delivery Address'),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _streetController,
-                decoration: _inputDecoration('Street Address *'),
-                validator: (value) => _selectedOrderType == OrderType.delivery && (value?.isEmpty ?? true)
-                    ? 'Street address is required for delivery' : null,
+              
+              // Clickable Address Boxes
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, color: Colors.orange.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Saved Addresses',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Address 1 and Address 2 Boxes
+                    Row(
+                      children: [
+                        // Address 1 Box
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _loadFromAddress1,
+                            child: Container(
+                              height: 50,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _savedAddress1 != null ? Colors.green.shade100 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _savedAddress1 != null ? Colors.green.shade300 : Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.home,
+                                    color: _savedAddress1 != null ? Colors.green.shade700 : Colors.grey.shade600,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Address 1',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _savedAddress1 != null ? Colors.green.shade800 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  if (_savedAddress1 != null) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green.shade700,
+                                      size: 14,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Address 2 Box
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _loadFromAddress2,
+                            child: Container(
+                              height: 50,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _savedAddress2 != null ? Colors.blue.shade100 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _savedAddress2 != null ? Colors.blue.shade300 : Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.business,
+                                    color: _savedAddress2 != null ? Colors.blue.shade700 : Colors.grey.shade600,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Address 2',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _savedAddress2 != null ? Colors.blue.shade800 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  if (_savedAddress2 != null) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.blue.shade700,
+                                      size: 14,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Instructions
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.orange.shade700, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'How to save addresses:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '1. Fill out the address details below\n2. Click "Save to Address 1" or "Save to Address 2"\n3. Click the address boxes above to load saved addresses',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Save Current Address Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _saveToAddress1,
+                            icon: const Icon(Icons.save, color: Colors.white, size: 14),
+                            label: const Text('Save to Address 1', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _saveToAddress2,
+                            icon: const Icon(Icons.save, color: Colors.white, size: 14),
+                            label: const Text('Save to Address 2', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Address Input Fields
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.edit_location, color: Colors.grey.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Enter Address Details',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    TextFormField(
+                      controller: _streetController,
+                      decoration: _inputDecoration('Street Address *'),
+                      validator: (value) => _selectedOrderType == OrderType.delivery && (value?.isEmpty ?? true)
+                          ? 'Street address is required for delivery' : null,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Row(
